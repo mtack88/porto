@@ -1,0 +1,17 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<svg width="180" height="210" viewBox="0 0 180 210" xmlns="http://www.w3.org/2000/svg" role="img" aria-label="Stemma con ancora">
+  <defs>
+    <style>
+      .shield{fill:#00A0E0; stroke:#222; stroke-width:6;}
+      .anchor{fill:#FFC20E; stroke:#222; stroke-width:4;}
+    </style>
+  </defs>
+  <path class="shield" d="M10,10 h160 v100 a80,80 0 0 1 -160,0 z"/>
+  <g class="anchor" transform="translate(90,95)">
+    <circle r="12" cy="-40"/>
+    <rect x="-20" y="-30" width="40" height="10" rx="5"/>
+    <rect x="-10" y="-30" width="10" height="85"/>
+    <path d="M-10,35 q-20,5 -28,23 a40,40 0 0 0 28,-10 z"/>
+    <path d="M0,35 q20,5 28,23 a40,40 0 0 1 -28,-10 z"/>
+  </g>
+</svg>

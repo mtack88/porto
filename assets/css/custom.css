@@ -1,0 +1,62 @@
+/* Brand e override Bootstrap */
+:root{
+  --brand-primary:#00A0E0;
+  --brand-accent:#FFC20E;
+  --brand-text:#333333;
+  --state-libero:#28a745;
+  --state-occupato:#dc3545;
+  --state-riservato:#ffc107;
+  --state-manutenzione:#6c757d;
+}
+body{color:var(--brand-text);}
+.navbar{background:var(--brand-primary);}
+.navbar .navbar-brand,.navbar .nav-link,.navbar .navbar-text{color:#fff !important;}
+.navbar .nav-link.active{font-weight:600; text-decoration:underline;}
+.btn-primary{background:var(--brand-primary); border-color:var(--brand-primary);}
+.btn-outline-primary{color:var(--brand-primary); border-color:var(--brand-primary);}
+.btn-outline-primary:hover{background:var(--brand-primary); color:#fff;}
+
+.badge-stato{color:#fff; font-weight:600;}
+.badge-libero{background:var(--state-libero);}
+.badge-occupato{background:var(--state-occupato);}
+.badge-riservato{background:var(--state-riservato); color:#212529;}
+.badge-manutenzione{background:var(--state-manutenzione);}
+
+.table-sticky thead th{position:sticky; top:0; background:#fff; z-index:2;}
+
+.card-brand{border-top:4px solid var(--brand-accent);}
+footer{border-top:1px solid #e9ecef; margin-top:2rem; padding-top:1rem; color:#666}
+
+svg.dock{width:100%; height:auto; display:block; background:#eaf7ff; border-radius:6px; border:1px solid #cfe6f5;}
+.dock-slot{cursor:pointer; transition:all .2s ease;}
+.dock-slot:hover{opacity:.85;}
+.dock-legend span{display:inline-block; padding:0.25rem 0.5rem; border-radius:4px; margin-right:0.5rem; font-size:.9rem; color:#fff}
+.dock-legend .libero{background:var(--state-libero);}
+.dock-legend .occupato{background:var(--state-occupato);}
+.dock-legend .riservato{background:var(--state-riservato); color:#212529}
+.dock-legend .manutenzione{background:var(--state-manutenzione);}
+
+/* Griglie precedenti */
+.grid-rack .slot{border:1px solid #dee2e6; border-radius:6px; padding:.6rem; text-align:left;}
+.grid-rack .slot .num{font-weight:600;}
+.grid-rack .slot.libero{background:#eaf9ee;}
+.grid-rack .slot.occupato{background:#fde9eb;}
+.grid-rack .slot.riservato{background:#fff6db;}
+.grid-rack .slot.manutenzione{background:#edeff2;}
+
+/* Utility */
+.form-help{font-size:.9rem; color:#6c757d}
+.small-muted{font-size:.9rem; color:#6c757d}
+.logo{height:36px;}
+
+/* Aggiunte v1.1 */
+.grid-rack .slot{min-height:86px}
+
+/* Hotfix: tabella rastrelliera 3×6 */
+.rack-table td{padding:.4rem; vertical-align:top;}
+.rack-cell{display:block; border:1px solid #dee2e6; border-radius:6px; padding:.6rem; text-align:center; min-height:86px;}
+.rack-cell .num{font-weight:600;}
+.rack-cell.libero{background:#eaf9ee;}
+.rack-cell.occupato{background:#fde9eb;}
+.rack-cell.riservato{background:#fff6db;}
+.rack-cell.manutenzione{background:#edeff2;}
