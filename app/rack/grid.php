@@ -14,11 +14,10 @@ $all = get_slots_with_current_assignment($marina['id']);
 $byNum = [];
 foreach ($all as $s) { $byNum[(int)$s['numero_esterno']] = $s; }
 
-// Costruisci tabella 6 righe x 3 colonne: R1–R6, R7–R12, R13–R18 per righe
+// Costruisci tabella 6 righe x 3 colonne: R1–R6, R7–R12, R13–R18 per colonne
 ?>
 <div class="container py-4">
   <h1 class="h4 mb-3">Rastrelliera — 3 colonne × 6 righe</h1>
-
   <div class="table-responsive">
     <table class="table rack-table align-middle">
       <tbody>
@@ -52,6 +51,15 @@ foreach ($all as $s) { $byNum[(int)$s['numero_esterno']] = $s; }
         <?php endfor; ?>
       </tbody>
     </table>
+  </div>
+  <div class="mt-3">
+    <div class="alert alert-info">
+      <strong>Legenda colori:</strong><br>
+      <span class="badge badge-stato badge-libero">Libero</span>
+      <span class="badge badge-stato badge-occupato">Occupato</span>
+      <span class="badge badge-stato badge-riservato">Riservato</span>
+      <span class="badge badge-stato badge-manutenzione">Manutenzione</span>
+    </div>
   </div>
 </div>
 <?php include __DIR__ . '/../../inc/layout/footer.php'; ?>

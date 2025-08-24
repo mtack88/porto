@@ -78,63 +78,61 @@ include __DIR__ . '/../../inc/layout/navbar.php';
 ?>
 <div class="container py-4" style="max-width: 760px;">
   <?php if ($errors): ?><div class="alert alert-danger"><?php foreach($errors as $er) echo '<div>'.e($er).'</div>'; ?></div><?php endif; ?>
-
   <div class="card shadow-sm">
     <div class="card-body">
       <h1 class="h5 mb-3">Aggiungi posto (porto)</h1>
-      <form method="post">
+      <form method="post" action="">
         <input type="hidden" name="csrf_token" value="<?= e(get_csrf_token()) ?>">
-
-        <div class="row g-2">
-          <div class="col-md-4">
-            <label class="form-label">Pontile</label>
-            <select name="marina" id="marina" class="form-select">
-              <?php foreach ($portMarinas as $m): $code=$m['code']; ?>
-                <option
-                  value="<?= e($code) ?>"
-                  data-next="<?= (int)($nextByCode[$code] ?? 1) ?>"
-                  <?= ($selCode===$code)?'selected':'' ?>>
-                  <?= e($m['name']) ?>
-                </option>
-              <?php endforeach; ?>
-            </select>
-            <div class="form-help">Solo porti (Rastrelliera esclusa).</div>
-          </div>
-          <div class="col-md-4">
-            <label class="form-label">Numero esterno</label>
-            <input type="number" name="numero_esterno" id="numero_esterno" class="form-control"
-                   value="<?= e($_POST['numero_esterno'] ?? $defaultNumero) ?>" min="1" required>
-            <div class="form-help" id="suggerito">Suggerito: <?= (int)$defaultNumero ?></div>
-          </div>
-          <div class="col-md-4">
-            <label class="form-label">Tipo</label>
-            <select name="tipo" class="form-select">
-              <option value="carrello" <?= (($_POST['tipo'] ?? 'carrello')==='carrello')?'selected':'' ?>>Carrello</option>
-              <option value="fune" <?= (($_POST['tipo'] ?? '')==='fune')?'selected':'' ?>>Fune</option>
-            </select>
-          </div>
-        </div>
-
-        <div class="row g-2 mt-2">
-          <div class="col-md-6">
-            <label class="form-label">Numero interno</label>
-            <input type="text" name="numero_interno" class="form-control" value="<?= e($_POST['numero_interno'] ?? '') ?>">
-          </div>
-          <div class="col-md-12">
-            <label class="form-label">Note</label>
-            <textarea name="note" rows="3" class="form-control"><?= e($_POST['note'] ?? '') ?></textarea>
-          </div>
-        </div>
-
-        <div class="mt-3 d-flex gap-2">
-          <button class="btn btn-primary">Aggiungi posto</button>
-          <a class="btn btn-outline-secondary" href="/app/slots/list.php?marina=<?= e($selCode) ?>">Annulla</a>
-        </div>
-      </form>
+    <div class="row g-2">
+      <div class="col-md-4">
+        <label class="form-label">Pontile</label>
+        <select name="marina" id="marina" class="form-select">
+          <?php foreach ($portMarinas as $m): $code=$m['code']; ?>
+            <option
+              value="<?= e($code) ?>"
+              data-next="<?= (int)($nextByCode[$code] ?? 1) ?>"
+              <?= ($selCode===$code)?'selected':'' ?>>
+              <?= e($m['name']) ?>
+            </option>
+          <?php endforeach; ?>
+        </select>
+        <div class="form-help">Solo porti (Rastrelliera esclusa).</div>
+      </div>
+      <div class="col-md-4">
+        <label class="form-label">Numero esterno</label>
+        <input type="number" name="numero_esterno" id="numero_esterno" class="form-control"
+               value="<?= e($_POST['numero_esterno'] ?? $defaultNumero) ?>" min="1" required>
+        <div class="form-help" id="suggerito">Suggerito: <?= (int)$defaultNumero ?></div>
+      </div>
+      <div class="col-md-4">
+        <label class="form-label">Tipo</label>
+        <select name="tipo" class="form-select">
+          <option value="carrello" <?= (($_POST['tipo'] ?? 'carrello')==='carrello')?'selected':'' ?>>Carrello</option>
+          <option value="fune" <?= (($_POST['tipo'] ?? '')==='fune')?'selected':'' ?>>Fune</option>
+        </select>
+      </div>
     </div>
-    <div class="card-footer small-muted">
-      Lo stato iniziale sarà “Libero” con inserimento automatico nello storico.
+
+    <div class="row g-2 mt-2">
+      <div class="col-md-6">
+        <label class="form-label">Numero interno</label>
+        <input type="text" name="numero_interno" class="form-control" value="<?= e($_POST['numero_interno'] ?? '') ?>">
+      </div>
+      <div class="col-md-12">
+        <label class="form-label">Note</label>
+        <textarea name="note" rows="3" class="form-control"><?= e($_POST['note'] ?? '') ?></textarea>
+      </div>
     </div>
+
+    <div class="mt-3 d-flex gap-2">
+      <button type="submit" class="btn btn-primary">Aggiungi posto</button>
+      <a class="btn btn-outline-secondary" href="/app/slots/list.php?marina=<?= e($selCode) ?>">Annulla</a>
+    </div>
+  </form>
+</div>
+<div class="card-footer small-muted">
+  Lo stato iniziale sarà "Libero" con inserimento automatico nello storico.
+</div>
   </div>
 </div>
 <script>
@@ -151,7 +149,7 @@ include __DIR__ . '/../../inc/layout/navbar.php';
       sug.textContent = 'Suggerito: ' + next;
     }
     sel.addEventListener('change', update);
-    // Non forziamo il valore se l’utente ne ha già digitato uno
+    // Non forziamo il valore se l'utente ne ha già digitato uno
     if (!num.value) update();
   })();
 </script>

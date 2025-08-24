@@ -11,13 +11,14 @@ include __DIR__ . '/../inc/layout/navbar.php';
   <h1 class="h4 mb-3">Porto W. Ritter — Mappa stilizzata</h1>
   <div id="dock-ritter"></div>
 </div>
-<script src="/assets/js/map.js"></script>
+<script src="/assets/js/map.js?v=<?= time() ?>"></script>
 <script>
+  // Forza refresh dei dati
   renderDock({
     containerId:'dock-ritter',
     code:'RITTER',
     count:18,
-    apiUrl:'/app/api/slot_status.php?code=RITTER',
+    apiUrl:'/app/api/slot_status.php?code=RITTER&t=' + Date.now(),
     title:'Porto W. Ritter'
   });
 </script>

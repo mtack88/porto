@@ -15,18 +15,14 @@ body{color:var(--brand-text);}
 .btn-primary{background:var(--brand-primary); border-color:var(--brand-primary);}
 .btn-outline-primary{color:var(--brand-primary); border-color:var(--brand-primary);}
 .btn-outline-primary:hover{background:var(--brand-primary); color:#fff;}
-
 .badge-stato{color:#fff; font-weight:600;}
 .badge-libero{background:var(--state-libero);}
 .badge-occupato{background:var(--state-occupato);}
 .badge-riservato{background:var(--state-riservato); color:#212529;}
 .badge-manutenzione{background:var(--state-manutenzione);}
-
 .table-sticky thead th{position:sticky; top:0; background:#fff; z-index:2;}
-
 .card-brand{border-top:4px solid var(--brand-accent);}
 footer{border-top:1px solid #e9ecef; margin-top:2rem; padding-top:1rem; color:#666}
-
 svg.dock{width:100%; height:auto; display:block; background:#eaf7ff; border-radius:6px; border:1px solid #cfe6f5;}
 .dock-slot{cursor:pointer; transition:all .2s ease;}
 .dock-slot:hover{opacity:.85;}
@@ -35,7 +31,6 @@ svg.dock{width:100%; height:auto; display:block; background:#eaf7ff; border-radi
 .dock-legend .occupato{background:var(--state-occupato);}
 .dock-legend .riservato{background:var(--state-riservato); color:#212529}
 .dock-legend .manutenzione{background:var(--state-manutenzione);}
-
 /* Griglie precedenti */
 .grid-rack .slot{border:1px solid #dee2e6; border-radius:6px; padding:.6rem; text-align:left;}
 .grid-rack .slot .num{font-weight:600;}
@@ -43,20 +38,75 @@ svg.dock{width:100%; height:auto; display:block; background:#eaf7ff; border-radi
 .grid-rack .slot.occupato{background:#fde9eb;}
 .grid-rack .slot.riservato{background:#fff6db;}
 .grid-rack .slot.manutenzione{background:#edeff2;}
-
 /* Utility */
 .form-help{font-size:.9rem; color:#6c757d}
 .small-muted{font-size:.9rem; color:#6c757d}
 .logo{height:36px;}
-
 /* Aggiunte v1.1 */
 .grid-rack .slot{min-height:86px}
-
-/* Hotfix: tabella rastrelliera 3×6 */
-.rack-table td{padding:.4rem; vertical-align:top;}
-.rack-cell{display:block; border:1px solid #dee2e6; border-radius:6px; padding:.6rem; text-align:center; min-height:86px;}
-.rack-cell .num{font-weight:600;}
-.rack-cell.libero{background:#eaf9ee;}
-.rack-cell.occupato{background:#fde9eb;}
-.rack-cell.riservato{background:#fff6db;}
-.rack-cell.manutenzione{background:#edeff2;}
+/* Rastrelliera 3×6 - FIX migliorato */
+.rack-table {
+width: 100%;
+max-width: 800px;
+margin: 0 auto;
+}
+.rack-table td {
+padding: 0.5rem;
+vertical-align: top;
+width: 33.33%;
+}
+.rack-cell {
+display: block;
+border: 2px solid #dee2e6;
+border-radius: 8px;
+padding: 1rem;
+text-align: center;
+min-height: 120px;
+transition: all 0.2s ease;
+cursor: pointer;
+}
+.rack-cell:hover {
+transform: translateY(-2px);
+box-shadow: 0 4px 8px rgba(0,0,0,0.1);
+}
+.rack-cell .num {
+font-weight: 700;
+font-size: 1.2rem;
+margin-bottom: 0.5rem;
+color: var(--brand-text);
+}
+.rack-cell.libero {
+background: #eaf9ee;
+border-color: var(--state-libero);
+}
+.rack-cell.occupato {
+background: #fde9eb;
+border-color: var(--state-occupato);
+}
+.rack-cell.riservato {
+background: #fff6db;
+border-color: var(--state-riservato);
+}
+.rack-cell.manutenzione {
+background: #edeff2;
+border-color: var(--state-manutenzione);
+}
+/* Fix pulsante form slots/create.php */
+.card-body form button[type="submit"],
+.card-body form button.btn-primary {
+visibility: visible !important;
+display: inline-block !important;
+}
+/* Responsive improvements */
+@media (max-width: 768px) {
+.rack-table td {
+padding: 0.25rem;
+}
+.rack-cell {
+padding: 0.75rem;
+min-height: 100px;
+}
+.rack-cell .num {
+font-size: 1rem;
+}
+}

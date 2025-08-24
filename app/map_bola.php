@@ -17,7 +17,7 @@ include __DIR__ . '/../inc/layout/navbar.php';
     containerId:'dock-bola',
     code:'BOLA',
     count:47,
-    apiUrl:'/app/api/slot_status.php?code=BOLA',
+    apiUrl:'/app/api/slot_status.php?code=BOLA&t=' + Date.now(),
     title:'Porto alla Bola'
   });
 </script>
