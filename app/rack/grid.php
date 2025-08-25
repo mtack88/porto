@@ -31,11 +31,18 @@ foreach ($all_slots as $slot) {
     <!-- Griglia usando CSS Grid -->
     <div style="display: grid; grid-template-columns: repeat(3, 1fr); gap: 15px; max-width: 900px; margin: 0 auto;">
         <?php
-        // Genera 18 posti (3 colonne x 6 righe)
-        // Ordine: colonna 1 (1-6), colonna 2 (7-12), colonna 3 (13-18)
-        for ($col = 0; $col < 3; $col++) {
-            for ($row = 1; $row <= 6; $row++) {
-                $posto_numero = ($col * 6) + $row;
+        // IMPORTANTE: Genera la griglia RIGA per RIGA ma con numerazione per COLONNA
+        // Quindi la prima riga avrà: 1, 7, 13
+        // La seconda riga avrà: 2, 8, 14
+        // E così via...
+        
+        for ($row = 0; $row < 6; $row++) {
+            for ($col = 0; $col < 3; $col++) {
+                // Formula per numerazione per colonna:
+                // Colonna 0: 1-6
+                // Colonna 1: 7-12
+                // Colonna 2: 13-18
+                $posto_numero = ($col * 6) + ($row + 1);
                 
                 // Verifica se il posto esiste nel database
                 $posto_dati = isset($slots_map[$posto_numero]) ? $slots_map[$posto_numero] : null;
@@ -115,6 +122,31 @@ foreach ($all_slots as $slot) {
             }
         }
         ?>
+    </div>
+    
+    <!-- Schema visivo per chiarezza -->
+    <div class="mt-4">
+        <div class="card">
+            <div class="card-header bg-light">
+                <h6 class="mb-0">Schema numerazione posti (per colonna)</h6>
+            </div>
+            <div class="card-body">
+                <div class="row text-center">
+                    <div class="col-4">
+                        <strong>Colonna 1</strong><br>
+                        R1 → R6
+                    </div>
+                    <div class="col-4">
+                        <strong>Colonna 2</strong><br>
+                        R7 → R12
+                    </div>
+                    <div class="col-4">
+                        <strong>Colonna 3</strong><br>
+                        R13 → R18
+                    </div>
+                </div>
+            </div>
+        </div>
     </div>
     
     <!-- Legenda e azioni -->
