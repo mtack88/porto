@@ -55,7 +55,17 @@ function get_slot_by_id(int $id): ?array {
   global $pdo; $s=$pdo->prepare("SELECT * FROM slots WHERE id=:id LIMIT 1"); $s->execute([':id'=>$id]); $r=$s->fetch(PDO::FETCH_ASSOC); return $r?:null;
 }
 function get_current_assignment(int $slot_id): ?array {
-  global $pdo; $s=$pdo->prepare("SELECT * FROM assignments WHERE slot_id=:id AND data_fine IS NULL ORDER BY id DESC LIMIT 1"); $s->execute([':id'=>$slot_id]); $r=$s->fetch(PDO::FETCH_ASSOC); return $r?:null;
+    global $pdo;
+    $s = $pdo->prepare("
+        SELECT * FROM assignments 
+        WHERE slot_id = :id 
+        AND (data_fine IS NULL OR data_fine = '0000-00-00' OR data_fine = '')
+        ORDER BY id DESC 
+        LIMIT 1
+    ");
+    $s->execute([':id' => $slot_id]);
+    $r = $s->fetch(PDO::FETCH_ASSOC);
+    return $r ?: null;
 }
 function get_assignments_history(int $slot_id): array {
   global $pdo; $s=$pdo->prepare("SELECT * FROM assignments WHERE slot_id=:id ORDER BY data_inizio DESC, id DESC"); $s->execute([':id'=>$slot_id]); return $s->fetchAll(PDO::FETCH_ASSOC);

@@ -21,7 +21,7 @@ if (isset($_GET['export']) && $_GET['export'] === '1') {
     exit;
 }
 
-// Query principale
+// Query principale - IMPORTANTE: recupera i dati corretti dalle assignments
 $sql = "SELECT 
         s.id,
         s.numero_esterno,
@@ -32,10 +32,13 @@ $sql = "SELECT
         s.deleted_at,
         m.code as marina_code,
         m.name as marina_name,
+        a.id as assignment_id,
         a.proprietario,
         a.targa,
         a.email,
-        a.telefono
+        a.telefono,
+        a.data_inizio,
+        a.data_fine
     FROM slots s
     INNER JOIN marinas m ON m.id = s.marina_id
     LEFT JOIN assignments a ON a.slot_id = s.id AND a.data_fine IS NULL
@@ -82,14 +85,23 @@ if ($q !== '') {
 
 $sql .= " ORDER BY m.code ASC, CAST(s.numero_esterno AS UNSIGNED) ASC ";
 
+// Debug - decommenta per vedere la query
+// echo "<pre>SQL: " . $sql . "\nParams: " . print_r($params, true) . "</pre>";
+
 // Esegui query
 $rows = array();
 try {
     $stmt = $pdo->prepare($sql);
     $stmt->execute($params);
     $rows = $stmt->fetchAll(PDO::FETCH_ASSOC);
+    
+    // Debug - decommenta per vedere i dati
+    // if (count($rows) > 0) {
+    //     echo "<pre>Prima riga dati: " . print_r($rows[0], true) . "</pre>";
+    // }
+    
 } catch (PDOException $e) {
-    echo "<div class='alert alert-danger'>Errore database: " . $e->getMessage() . "</div>";
+    echo "<div class='alert alert-danger'>Errore database: " . htmlspecialchars($e->getMessage()) . "</div>";
 }
 
 // Liste per filtri
@@ -224,55 +236,66 @@ include __DIR__ . '/../../inc/layout/navbar.php';
                 </thead>
                 <tbody>
                     <?php foreach ($rows as $row): 
-                        // Converti tutto in stringhe per evitare errori
-                        $id = (int)($row['id'] ?? 0);
-                        $numero = (string)($row['numero_esterno'] ?? '');
+                        // Debug singola riga - decommenta se necessario
+                        // echo "<!-- Debug riga: " . print_r($row, true) . " -->";
+                        
+                        $id = (int)$row['id'];
+                        $numero = (string)$row['numero_esterno'];
                         $numero_interno = (string)($row['numero_interno'] ?? '');
-                        $marina_name = (string)($row['marina_name'] ?? '');
+                        $marina_name = (string)$row['marina_name'];
                         $tipo_posto = (string)($row['tipo'] ?? '');
-                        $stato_posto = (string)($row['stato'] ?? 'Libero');
-                        $proprietario = (string)($row['proprietario'] ?? '');
-                        $targa = (string)($row['targa'] ?? '');
-                        $email = (string)($row['email'] ?? '');
-                        $telefono = (string)($row['telefono'] ?? '');
+                        $stato_posto = (string)$row['stato'];
+                        
+                        // Dati assegnazione - verifica che esistano
+                        $proprietario = isset($row['proprietario']) && !is_null($row['proprietario']) 
+                                        ? (string)$row['proprietario'] 
+                                        : '';
+                        $targa = isset($row['targa']) && !is_null($row['targa']) 
+                                 ? (string)$row['targa'] 
+                                 : '';
+                        $email = isset($row['email']) && !is_null($row['email']) 
+                                 ? (string)$row['email'] 
+                                 : '';
+                        $telefono = isset($row['telefono']) && !is_null($row['telefono']) 
+                                    ? (string)$row['telefono'] 
+                                    : '';
+                        
                         $deleted = !empty($row['deleted_at']);
                     ?>
                     <tr class="<?php echo $deleted ? 'table-warning' : ''; ?>">
                         <td>
-                            <small class="text-muted"><?php echo $marina_name; ?></small>
+                            <small class="text-muted"><?php echo htmlspecialchars($marina_name); ?></small>
                         </td>
                         <td>
-                            <strong><?php echo $numero; ?></strong>
+                            <strong><?php echo htmlspecialchars($numero); ?></strong>
                         </td>
                         <td>
-                            <?php echo $numero_interno ?: '-'; ?>
+                            <?php echo htmlspecialchars($numero_interno ?: '-'); ?>
                         </td>
                         <td>
-                            <?php echo $tipo_posto ?: '-'; ?>
+                            <?php echo htmlspecialchars($tipo_posto ?: '-'); ?>
                         </td>
                         <td>
-                            <?php 
-                            // Status badge
-                            echo status_badge($stato_posto);
-                            ?>
+                            <?php echo status_badge($stato_posto); ?>
                         </td>
                         <td>
-                            <?php if ($proprietario): ?>
-                                <strong><?php echo $proprietario; ?></strong>
+                            <?php if ($proprietario !== ''): ?>
+                                <strong><?php echo htmlspecialchars($proprietario); ?></strong>
                             <?php else: ?>
                                 <span class="text-muted">-</span>
                             <?php endif; ?>
                         </td>
                         <td>
-                            <?php echo $targa ?: '-'; ?>
+                            <?php echo htmlspecialchars($targa ?: '-'); ?>
                         </td>
                         <td>
-                            <?php if ($email || $telefono): ?>
-                                <?php if ($email): ?>
-                                    <small><?php echo $email; ?></small><br>
+                            <?php if ($email !== '' || $telefono !== ''): ?>
+                                <?php if ($email !== ''): ?>
+                                    <small><?php echo htmlspecialchars($email); ?></small>
                                 <?php endif; ?>
-                                <?php if ($telefono): ?>
-                                    <small><?php echo $telefono; ?></small>
+                                <?php if ($email !== '' && $telefono !== ''): ?><br><?php endif; ?>
+                                <?php if ($telefono !== ''): ?>
+                                    <small><?php echo htmlspecialchars($telefono); ?></small>
                                 <?php endif; ?>
                             <?php else: ?>
                                 <span class="text-muted">-</span>

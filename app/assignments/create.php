@@ -19,6 +19,17 @@ if (!$slot) {
 // Carica marina
 $marina = get_marina_by_id((int)$slot['marina_id']);
 
+// Trova l'assegnazione attuale (quella senza data_fine o con data 0000-00-00)
+$stmt = $pdo->prepare("
+    SELECT * FROM assignments 
+    WHERE slot_id = :sid 
+    AND (data_fine IS NULL OR data_fine = '0000-00-00' OR data_fine = '')
+    ORDER BY id DESC 
+    LIMIT 1
+");
+$stmt->execute([':sid' => $slot_id]);
+$current_assignment = $stmt->fetch(PDO::FETCH_ASSOC);
+
 // Se c'è POST, processa il form
 if ($_SERVER['REQUEST_METHOD'] === 'POST') {
     $stato = $_POST['stato'] ?? 'Occupato';
@@ -32,9 +43,42 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
     try {
         $pdo->beginTransaction();
         
-        // Chiudi eventuale assegnazione precedente
-        $stmt = $pdo->prepare("UPDATE assignments SET data_fine = ? WHERE slot_id = ? AND data_fine IS NULL");
-        $stmt->execute([date('Y-m-d'), $slot_id]);
+        // Se c'è un'assegnazione corrente, chiudila il giorno prima
+        if ($current_assignment) {
+            // Calcola data chiusura (giorno prima della nuova)
+            $data_chiusura = new DateTime($data_inizio);
+            $data_chiusura->modify('-1 day');
+            
+            $stmt = $pdo->prepare("
+                UPDATE assignments 
+                SET data_fine = :df 
+                WHERE id = :id
+            ");
+            $stmt->execute([
+                ':df' => $data_chiusura->format('Y-m-d'),
+                ':id' => $current_assignment['id']
+            ]);
+            
+            // Debug
+            error_log("Chiusa assegnazione ID " . $current_assignment['id'] . " con data_fine: " . $data_chiusura->format('Y-m-d'));
+        }
+        
+        // Chiudi TUTTE le altre assegnazioni ancora aperte
+        $data_chiusura_altre = new DateTime($data_inizio);
+        $data_chiusura_altre->modify('-1 day');
+        
+        $stmt = $pdo->prepare("
+            UPDATE assignments 
+            SET data_fine = :df 
+            WHERE slot_id = :sid 
+            AND (data_fine IS NULL OR data_fine = '0000-00-00' OR data_fine = '')
+            AND id != :exclude_id
+        ");
+        $stmt->execute([
+            ':df' => $data_chiusura_altre->format('Y-m-d'),
+            ':sid' => $slot_id,
+            ':exclude_id' => $current_assignment ? $current_assignment['id'] : 0
+        ]);
         
         // Crea nuova assegnazione
         $stmt = $pdo->prepare("
@@ -42,6 +86,10 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
             (slot_id, stato, proprietario, targa, email, telefono, data_inizio, data_fine, created_by, created_at)
             VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, NOW())
         ");
+        
+        // Se data_fine è vuota, usa NULL o '0000-00-00' a seconda del database
+        $data_fine_value = $data_fine ?: null;
+        
         $stmt->execute([
             $slot_id,
             $stato,
@@ -50,15 +98,38 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
             $email ?: null,
             $telefono ?: null,
             $data_inizio,
-            $data_fine,
+            $data_fine_value,
             current_user_id()
         ]);
+        
+        $new_assignment_id = (int)$pdo->lastInsertId();
         
         // Aggiorna stato slot
         $stmt = $pdo->prepare("UPDATE slots SET stato = ?, updated_at = NOW() WHERE id = ?");
         $stmt->execute([$stato, $slot_id]);
         
+        // Log
+        log_event('assignment', $new_assignment_id, 'create', [
+            'slot_id' => $slot_id,
+            'stato' => $stato,
+            'proprietario' => $proprietario,
+            'chiusa_precedente' => $current_assignment ? $current_assignment['id'] : null
+        ]);
+        
         $pdo->commit();
+        
+        // Messaggio di successo
+        if ($current_assignment && !empty($current_assignment['proprietario'])) {
+            set_flash('success', sprintf(
+                'Assegnazione cambiata. %s termina il %s, %s inizia il %s',
+                $current_assignment['proprietario'],
+                format_date_from_ymd($data_chiusura->format('Y-m-d')),
+                $proprietario ?: 'Nuova assegnazione',
+                format_date_from_ymd($data_inizio)
+            ));
+        } else {
+            set_flash('success', 'Assegnazione creata con successo');
+        }
         
         header('Location: /app/slots/view.php?id=' . $slot_id);
         exit;
@@ -80,13 +151,27 @@ include __DIR__ . '/../../inc/layout/navbar.php';
         <div class="col-md-6">
             
             <h1 class="h4 mb-3">
-                Assegna Posto <?php echo $slot['numero_esterno']; ?> 
+                <?php if ($current_assignment): ?>
+                    Cambia assegnazione - Posto <?php echo $slot['numero_esterno']; ?>
+                <?php else: ?>
+                    Assegna Posto <?php echo $slot['numero_esterno']; ?>
+                <?php endif; ?>
                 (<?php echo $marina['name']; ?>)
             </h1>
             
             <?php if (isset($error)): ?>
                 <div class="alert alert-danger">
                     Errore: <?php echo htmlspecialchars($error); ?>
+                </div>
+            <?php endif; ?>
+            
+            <?php if ($current_assignment && !empty($current_assignment['proprietario'])): ?>
+                <div class="alert alert-info">
+                    <strong>⚠️ Assegnazione attuale:</strong><br>
+                    Proprietario: <strong><?php echo htmlspecialchars($current_assignment['proprietario']); ?></strong><br>
+                    Dal: <?php echo format_date_from_ymd($current_assignment['data_inizio']); ?><br>
+                    <hr>
+                    <small>✓ Questa assegnazione terminerà automaticamente il giorno prima della nuova data di inizio</small>
                 </div>
             <?php endif; ?>
             
@@ -111,7 +196,8 @@ include __DIR__ . '/../../inc/layout/navbar.php';
                         <div class="mb-3">
                             <label class="form-label">Proprietario/Assegnatario</label>
                             <input type="text" name="proprietario" class="form-control" 
-                                   placeholder="Nome e cognome">
+                                   placeholder="Nome e cognome" 
+                                   value="<?php echo htmlspecialchars($_POST['proprietario'] ?? ''); ?>">
                             <small class="text-muted">Lascia vuoto per stato "Libero"</small>
                         </div>
                         
@@ -119,32 +205,37 @@ include __DIR__ . '/../../inc/layout/navbar.php';
                             <div class="col-md-6 mb-3">
                                 <label class="form-label">Targa/Matricola</label>
                                 <input type="text" name="targa" class="form-control" 
-                                       placeholder="Es: BA123XY">
+                                       placeholder="Es: BA123XY"
+                                       value="<?php echo htmlspecialchars($_POST['targa'] ?? ''); ?>">
                             </div>
                             
                             <div class="col-md-6 mb-3">
                                 <label class="form-label">Telefono</label>
                                 <input type="tel" name="telefono" class="form-control" 
-                                       placeholder="333 1234567">
+                                       placeholder="333 1234567"
+                                       value="<?php echo htmlspecialchars($_POST['telefono'] ?? ''); ?>">
                             </div>
                         </div>
                         
                         <div class="mb-3">
                             <label class="form-label">Email</label>
                             <input type="email" name="email" class="form-control" 
-                                   placeholder="email@esempio.it">
+                                   placeholder="email@esempio.it"
+                                   value="<?php echo htmlspecialchars($_POST['email'] ?? ''); ?>">
                         </div>
                         
                         <div class="row">
                             <div class="col-md-6 mb-3">
                                 <label class="form-label">Data inizio *</label>
                                 <input type="date" name="data_inizio" class="form-control" 
-                                       value="<?php echo date('Y-m-d'); ?>" required>
+                                       value="<?php echo $_POST['data_inizio'] ?? date('Y-m-d'); ?>" 
+                                       required>
                             </div>
                             
                             <div class="col-md-6 mb-3">
                                 <label class="form-label">Data fine</label>
-                                <input type="date" name="data_fine" class="form-control">
+                                <input type="date" name="data_fine" class="form-control"
+                                       value="<?php echo htmlspecialchars($_POST['data_fine'] ?? ''); ?>">
                                 <small class="text-muted">Lascia vuoto se indeterminata</small>
                             </div>
                         </div>
