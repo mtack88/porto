@@ -278,44 +278,49 @@ include __DIR__ . '/../../inc/layout/navbar.php';
     </div>
 
     <!-- Modal per liberare il posto -->
-    <?php if ($current && $slot['stato'] !== 'Libero'): ?>
+    <?php if ($slot['stato'] !== 'Libero'): ?>
     <div class="modal fade" id="liberaPostoModal" tabindex="-1">
         <div class="modal-dialog">
             <div class="modal-content">
-                <form method="POST" action="/app/assignments/libera_posto.php">
+                <form method="POST" action="/app/assignments/libera_posto.php" onsubmit="console.log('Form submitted'); return true;">
                     <input type="hidden" name="slot_id" value="<?php echo $id; ?>">
                     
                     <div class="modal-header">
-                        <h5 class="modal-title">Libera Posto</h5>
+                        <h5 class="modal-title">Libera Posto <?php echo $slot['numero_esterno']; ?></h5>
                         <button type="button" class="btn-close" data-bs-dismiss="modal"></button>
                     </div>
                     
                     <div class="modal-body">
+                        <!-- Debug info -->
+                        <div class="alert alert-info small">
+                            <strong>Debug Info:</strong><br>
+                            Slot ID: <?php echo $id; ?><br>
+                            Stato attuale: <?php echo $slot['stato']; ?><br>
+                            <?php if ($current): ?>
+                            Assignment ID: <?php echo $current['id'] ?? 'N/A'; ?><br>
+                            Proprietario: <?php echo $current['proprietario'] ?? 'N/A'; ?><br>
+                            Data fine attuale: <?php echo $current['data_fine'] ?? '0000-00-00'; ?>
+                            <?php else: ?>
+                            Nessuna assegnazione corrente
+                            <?php endif; ?>
+                        </div>
+                        
                         <p>Stai per liberare il posto <strong><?php echo $slot['numero_esterno']; ?></strong></p>
                         
-                        <?php if (!empty($current['proprietario'])): ?>
-                        <div class="alert alert-info">
-                            Attualmente assegnato a: <strong><?php echo htmlspecialchars($current['proprietario']); ?></strong><br>
-                            Dal: <?php echo format_date_from_ymd($current['data_inizio']); ?>
-                        </div>
+                        <?php if ($current && !empty($current['proprietario'])): ?>
+                        <p>Attualmente assegnato a: <strong><?php echo htmlspecialchars($current['proprietario']); ?></strong></p>
                         <?php endif; ?>
                         
                         <div class="mb-3">
                             <label class="form-label">Data di liberazione *</label>
                             <input type="date" 
-                                name="data_liberazione" 
-                                class="form-control" 
-                                value="<?php echo date('Y-m-d'); ?>" 
-                                required>
+                                   name="data_liberazione" 
+                                   class="form-control" 
+                                   value="<?php echo date('Y-m-d'); ?>" 
+                                   required>
                             <small class="text-muted">
                                 L'assegnazione terminerà in questa data
                             </small>
-                        </div>
-                        
-                        <div class="mb-3">
-                            <label class="form-label">Note (opzionale)</label>
-                            <textarea name="note" class="form-control" rows="2" 
-                                    placeholder="Motivo liberazione..."></textarea>
                         </div>
                     </div>
                     

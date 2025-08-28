@@ -21,32 +21,59 @@ if ($slot_id <= 0) {
 try {
     $pdo->beginTransaction();
     
-    // 1. Trova tutte le assegnazioni aperte (con data_fine NULL o 0000-00-00)
+    // 1. Trova l'ultima assegnazione NON "Libero"
     $stmt = $pdo->prepare("
         SELECT * FROM assignments 
         WHERE slot_id = :sid 
-        AND (data_fine IS NULL OR data_fine = '0000-00-00' OR data_fine = '')
-        ORDER BY id DESC
+        AND stato != 'Libero'
+        ORDER BY id DESC 
+        LIMIT 1
     ");
     $stmt->execute([':sid' => $slot_id]);
-    $open_assignments = $stmt->fetchAll(PDO::FETCH_ASSOC);
+    $current = $stmt->fetch(PDO::FETCH_ASSOC);
     
-    // 2. Chiudi tutte le assegnazioni aperte con la data di liberazione
-    if (count($open_assignments) > 0) {
-        $stmt = $pdo->prepare("
-            UPDATE assignments 
-            SET data_fine = :df
-            WHERE slot_id = :sid 
-            AND (data_fine IS NULL OR data_fine = '0000-00-00' OR data_fine = '')
-        ");
-        $stmt->execute([
-            ':df' => $data_liberazione,
-            ':sid' => $slot_id
-        ]);
+    if ($current) {
+        // Aggiorna data_fine se necessario
+        $current_fine = $current['data_fine'] ?? '0000-00-00';
         
-        // Debug
-        error_log("Chiuse " . count($open_assignments) . " assegnazioni per slot $slot_id con data $data_liberazione");
+        if ($current_fine == '0000-00-00' || 
+            $current_fine == '' || 
+            $current_fine === null ||
+            $current_fine > $data_liberazione) {
+            
+            $stmt = $pdo->prepare("
+                UPDATE assignments 
+                SET data_fine = :df
+                WHERE id = :id
+            ");
+            $result = $stmt->execute([
+                ':df' => $data_liberazione,
+                ':id' => $current['id']
+            ]);
+            
+            if (!$result) {
+                throw new Exception("Impossibile aggiornare data_fine");
+            }
+        }
     }
+    
+    // 2. Chiudi TUTTE le altre assegnazioni senza data_fine o con data posteriore
+    $stmt = $pdo->prepare("
+        UPDATE assignments 
+        SET data_fine = :df
+        WHERE slot_id = :sid 
+        AND (
+            data_fine IS NULL 
+            OR data_fine = '0000-00-00' 
+            OR data_fine = ''
+            OR data_fine > :df2
+        )
+    ");
+    $stmt->execute([
+        ':df' => $data_liberazione,
+        ':df2' => $data_liberazione,
+        ':sid' => $slot_id
+    ]);
     
     // 3. Crea nuova assegnazione "Libero" dal giorno dopo
     $data_inizio_libero = new DateTime($data_liberazione);
@@ -54,17 +81,14 @@ try {
     
     $stmt = $pdo->prepare("
         INSERT INTO assignments 
-        (slot_id, stato, proprietario, data_inizio, data_fine, note, created_by, created_at)
-        VALUES (:sid, 'Libero', NULL, :di, NULL, :note, :uid, NOW())
+        (slot_id, stato, proprietario, data_inizio, data_fine, created_by, created_at)
+        VALUES (:sid, 'Libero', NULL, :di, NULL, :uid, NOW())
     ");
     $stmt->execute([
         ':sid' => $slot_id,
         ':di' => $data_inizio_libero->format('Y-m-d'),
-        ':note' => $note ?: null,
         ':uid' => current_user_id()
     ]);
-    
-    $new_id = (int)$pdo->lastInsertId();
     
     // 4. Aggiorna stato slot a Libero
     $stmt = $pdo->prepare("
@@ -74,22 +98,13 @@ try {
     ");
     $stmt->execute([':id' => $slot_id]);
     
-    // 5. Log evento
-    log_event('assignment', $new_id, 'libera', [
-        'slot_id' => $slot_id,
-        'data_liberazione' => $data_liberazione,
-        'assegnazioni_chiuse' => count($open_assignments),
-        'note' => $note
-    ]);
-    
     $pdo->commit();
     
     set_flash('success', 'Posto liberato correttamente dal ' . format_date_from_ymd($data_liberazione));
     
 } catch (Exception $e) {
     $pdo->rollBack();
-    error_log("Errore liberazione posto: " . $e->getMessage());
-    set_flash('error', 'Errore durante la liberazione: ' . $e->getMessage());
+    set_flash('error', 'Errore: ' . $e->getMessage());
 }
 
 // Reindirizza al view del posto
