@@ -1,5 +1,11 @@
 <?php
 declare(strict_types=1);
+
+// ABILITA LA VISUALIZZAZIONE DEGLI ERRORI
+ini_set('display_errors', '1');
+ini_set('display_startup_errors', '1');
+error_reporting(E_ALL);
+
 require_once __DIR__ . '/../../inc/bootstrap.php';
 require_login();
 
@@ -45,6 +51,15 @@ include __DIR__ . '/../../inc/layout/navbar.php';
     <h1 class="h4 mb-0">Storico assegnazioni</h1>
     <a class="btn btn-outline-primary btn-sm" href="?<?= http_build_query(array_merge($_GET,['export'=>1])) ?>">Esporta CSV storico</a>
   </div>
+
+  <!-- DEBUG MESSAGE -->
+  <div class="alert alert-info">
+    <strong>Debug:</strong> <?= count($rows) ?> record trovati.
+    <?php if (count($rows) > 0): ?>
+      Prima riga: <?= htmlspecialchars((string)($rows[0]['marina_name'] ?? 'N/A')) ?> - <?= htmlspecialchars((string)($rows[0]['numero_esterno'] ?? 'N/A')) ?>
+    <?php endif; ?>
+  </div>
+
   <form method="get" class="card p-3 mb-3">
     <div class="row g-2">
       <div class="col-md-3">
@@ -94,17 +109,47 @@ include __DIR__ . '/../../inc/layout/navbar.php';
         </tr>
       </thead>
       <tbody>
-        <?php foreach ($rows as $r): ?>
+        <?php if (count($rows) === 0): ?>
           <tr>
-            <td><?= e($r['marina_name']) ?></td>
-            <td><?= e($r['numero_esterno']) ?></td>
-            <td><?= status_badge($r['stato']) ?></td>
-            <td><?= e($r['proprietario']) ?></td>
-            <td><?= e($r['targa']) ?></td>
-            <td><?= e(format_date_from_ymd($r['data_inizio'])) ?></td>
-            <td><?= e(format_date_from_ymd($r['data_fine'])) ?: '—' ?></td>
+            <td colspan="7" class="text-center py-4">
+              <div class="text-muted">Nessun record trovato nello storico</div>
+            </td>
           </tr>
-        <?php endforeach; ?>
+        <?php else: ?>
+          <?php foreach ($rows as $index => $r): ?>
+            <tr>
+              <td><?= htmlspecialchars((string)($r['marina_name'] ?? 'N/A')) ?></td>
+              <td><?= htmlspecialchars((string)($r['numero_esterno'] ?? 'N/A')) ?></td>
+              <td>
+                <?php 
+                $stato_val = $r['stato'] ?? 'Sconosciuto';
+                $badge_class = match($stato_val) {
+                    'Libero' => 'bg-success',
+                    'Occupato' => 'bg-danger',
+                    'Riservato' => 'bg-warning',
+                    'Manutenzione' => 'bg-info',
+                    default => 'bg-secondary'
+                };
+                ?>
+                <span class="badge <?= $badge_class ?>"><?= htmlspecialchars((string)$stato_val) ?></span>
+              </td>
+              <td><?= htmlspecialchars((string)($r['proprietario'] ?? '—')) ?></td>
+              <td><?= htmlspecialchars((string)($r['targa'] ?? '—')) ?></td>
+              <td>
+                <?php
+                $data_inizio = $r['data_inizio'] ?? '';
+                echo htmlspecialchars((string)($data_inizio && $data_inizio !== '0000-00-00' ? (format_date_from_ymd($data_inizio) ?? '—') : '—'));
+                ?>
+              </td>
+              <td>
+                <?php
+                $data_fine = $r['data_fine'] ?? '';
+                echo htmlspecialchars((string)($data_fine && $data_fine !== '0000-00-00' ? (format_date_from_ymd($data_fine) ?? '—') : '—'));
+                ?>
+              </td>
+            </tr>
+          <?php endforeach; ?>
+        <?php endif; ?>
       </tbody>
     </table>
   </div>
