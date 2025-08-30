@@ -80,30 +80,139 @@ function get_slots_with_current_assignment(int $marina_id): array {
 }
 
 // CSV export
-function export_slots_csv(string $marinaCode, string $stato, string $tipo, string $num, string $num_int, string $q, bool $show_deleted): void {
-  global $pdo;
-  $params = [];
-  $sql = "SELECT m.code as pontile, s.numero_esterno as numero, s.numero_interno, s.tipo, s.stato, a.proprietario, a.targa, a.email, a.telefono
-          FROM slots s
-          JOIN marinas m ON m.id = s.marina_id
-          LEFT JOIN assignments a ON a.slot_id = s.id AND a.data_fine IS NULL
-          WHERE 1=1 ";
-  if (!$show_deleted) $sql .= " AND s.deleted_at IS NULL ";
-  if ($marinaCode) { $sql .= " AND m.code = :code "; $params[':code']=$marinaCode; }
-  if ($stato) { $sql .= " AND s.stato = :st "; $params[':st']=$stato; }
-  if ($tipo) { $sql .= " AND s.tipo = :tp "; $params[':tp']=$tipo; }
-  if ($num) { $sql .= " AND s.numero_esterno = :num "; $params[':num']=(int)$num; }
-  if ($num_int) { $sql .= " AND s.numero_interno LIKE :nint "; $params[':nint'] = '%'.$num_int.'%'; }
-  if ($q) { $sql .= " AND (a.proprietario LIKE :q OR a.targa LIKE :q) "; $params[':q']='%'.$q.'%'; }
-  $sql .= " ORDER BY m.code, s.numero_esterno";
-
-  $stmt = $pdo->prepare($sql); $stmt->execute($params);
-  header('Content-Type: text/csv; charset=utf-8');
-  header('Content-Disposition: attachment; filename="situazione_posti.csv"');
-  $out = fopen('php://output', 'w');
-  fputcsv($out, ['pontile','numero','numero_interno','tipo','stato','proprietario','targa','email','telefono'], ';');
-  while ($r = $stmt->fetch(PDO::FETCH_ASSOC)) { fputcsv($out, $r, ';'); }
-  fclose($out);
+function export_slots_csv($marinaCode='', $stato='', $tipo='', $num='', $num_int='', $q='', $show_deleted=false) {
+    global $pdo;
+    
+    // Query con JOIN per includere dati assegnazione
+    $sql = "SELECT 
+            s.numero_esterno,
+            s.numero_interno,
+            s.tipo,
+            s.stato,
+            m.name as marina_name,
+            a.proprietario,
+            a.targa,
+            a.email,
+            a.telefono,
+            a.data_inizio,
+            a.data_fine,
+            s.note
+        FROM slots s
+        INNER JOIN marinas m ON m.id = s.marina_id
+        LEFT JOIN (
+            SELECT a1.* 
+            FROM assignments a1
+            INNER JOIN (
+                SELECT slot_id, MAX(id) as max_id
+                FROM assignments
+                GROUP BY slot_id
+            ) a2 ON a1.slot_id = a2.slot_id AND a1.id = a2.max_id
+        ) a ON a.slot_id = s.id
+        WHERE 1=1 ";
+    
+    $params = array();
+    
+    // Applica filtri
+    if (!$show_deleted) {
+        $sql .= " AND s.deleted_at IS NULL ";
+    }
+    
+    if ($marinaCode !== '') {
+        $sql .= " AND m.code = :marina_code ";
+        $params[':marina_code'] = $marinaCode;
+    }
+    
+    if ($stato !== '') {
+        $sql .= " AND s.stato = :stato ";
+        $params[':stato'] = $stato;
+    }
+    
+    if ($tipo !== '') {
+        $sql .= " AND s.tipo = :tipo ";
+        $params[':tipo'] = $tipo;
+    }
+    
+    if ($num !== '') {
+        $sql .= " AND s.numero_esterno = :numero ";
+        $params[':numero'] = (int)$num;
+    }
+    
+    if ($num_int !== '') {
+        $sql .= " AND s.numero_interno LIKE :num_int ";
+        $params[':num_int'] = '%' . $num_int . '%';
+    }
+    
+    if ($q !== '') {
+        $sql .= " AND (a.proprietario LIKE :q OR a.targa LIKE :q2 OR a.email LIKE :q3) ";
+        $params[':q'] = '%' . $q . '%';
+        $params[':q2'] = '%' . $q . '%';
+        $params[':q3'] = '%' . $q . '%';
+    }
+    
+    $sql .= " ORDER BY m.code ASC, CAST(s.numero_esterno AS UNSIGNED) ASC ";
+    
+    $stmt = $pdo->prepare($sql);
+    $stmt->execute($params);
+    $rows = $stmt->fetchAll(PDO::FETCH_ASSOC);
+    
+    // Headers CSV
+    header('Content-Type: text/csv; charset=utf-8');
+    header('Content-Disposition: attachment; filename="posti_' . date('Y-m-d_His') . '.csv"');
+    
+    // BOM per Excel
+    echo "\xEF\xBB\xBF";
+    
+    // Output CSV
+    $output = fopen('php://output', 'w');
+    
+    // Intestazioni
+    fputcsv($output, [
+        'Pontile',
+        'Numero',
+        'Numero Interno',
+        'Tipo',
+        'Stato',
+        'Proprietario',
+        'Targa',
+        'Email',
+        'Telefono',
+        'Data Inizio',
+        'Data Fine',
+        'Note'
+    ], ';');
+    
+    // Dati
+    foreach ($rows as $row) {
+        // Formatta date
+        $data_inizio = '';
+        $data_fine = '';
+        
+        if (!empty($row['data_inizio']) && $row['data_inizio'] != '0000-00-00') {
+            $data_inizio = format_date_from_ymd($row['data_inizio']);
+        }
+        
+        if (!empty($row['data_fine']) && $row['data_fine'] != '0000-00-00') {
+            $data_fine = format_date_from_ymd($row['data_fine']);
+        }
+        
+        fputcsv($output, [
+            $row['marina_name'],
+            $row['numero_esterno'],
+            $row['numero_interno'] ?: '',
+            $row['tipo'] ?: '',
+            $row['stato'],
+            $row['proprietario'] ?: '',
+            $row['targa'] ?: '',
+            $row['email'] ?: '',
+            $row['telefono'] ?: '',
+            $data_inizio,
+            $data_fine,
+            $row['note'] ?: ''
+        ], ';');
+    }
+    
+    fclose($output);
+    exit;
 }
 
 function export_history_csv(string $marinaCode, string $stato, string $dal, string $al, int $slot_id): void {

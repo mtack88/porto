@@ -17,8 +17,9 @@ declare(strict_types=1);
         <li class="nav-item"><a class="nav-link <?= ($active??'')==='map_ritter'?'active':'' ?>" href="/app/map_ritter.php">Mappa Ritter</a></li>
         <li class="nav-item"><a class="nav-link <?= ($active??'')==='rack'?'active':'' ?>" href="/app/rack/grid.php">Rastrelliera</a></li>
         <li class="nav-item"><a class="nav-link <?= ($active??'')==='slots_list'?'active':'' ?>" href="/app/slots/list.php">Tabella posti</a></li>
-        <!-- <li class="nav-item"><a class="nav-link <?= ($active??'')==='history'?'active':'' ?>" href="/app/history/list.php">Storico</a></li>
-        <li class="nav-item"><a class="nav-link <?= ($active??'')==='import'?'active':'' ?>" href="/app/slots/import.php">Import CSV</a></li> -->
+        <li class="nav-item"><a class="nav-link <?= ($active??'')==='history'?'active':'' ?>" href="/app/history/list.php">Storico</a></li>
+        <li class="nav-item"><a class="nav-link <?= ($active??'')==='waiting_list'?'active':'' ?>"href="/app/waiting/list.php">Lista attesa</a></li>
+        <!-- <li class="nav-item"><a class="nav-link <?= ($active??'')==='import'?'active':'' ?>" href="/app/slots/import.php">Import CSV</a></li> -->
       </ul>
       <span class="navbar-text me-3">Ciao, <?= e(current_user()['name'] ?? '') ?></span>
       <a class="btn btn-outline-light btn-sm" href="/auth/logout.php" data-confirm="Vuoi uscire dall'applicazione?">Esci</a>

@@ -277,6 +277,156 @@ include __DIR__ . '/../../inc/layout/navbar.php';
         </div>
     </div>
 
+    <!-- ALLEGATI -->
+    <div class="card mt-3">
+        <div class="card-header">
+            <div class="d-flex justify-content-between align-items-center">
+                <strong>📎 Allegati</strong>
+                <a href="/app/attachments/upload_form.php?entity_type=slot&entity_id=<?php echo $id; ?>" 
+                   class="btn btn-sm btn-success">
+                    + Aggiungi allegato
+                </a>
+            </div>
+        </div>
+        <div class="card-body">
+            <?php 
+            // Query SENZA JOIN per evitare problemi
+            $stmt = $pdo->prepare("
+                SELECT * FROM attachments 
+                WHERE entity_type = ? AND entity_id = ?
+                ORDER BY uploaded_at DESC
+            ");
+            $stmt->execute(['slot', $id]);
+            $attachments = $stmt->fetchAll(PDO::FETCH_ASSOC);
+            
+            // Debug
+            echo "<!-- Trovati " . count($attachments) . " allegati -->";
+            ?>
+            
+            <?php if (count($attachments) > 0): ?>
+                <div class="table-responsive">
+                    <table class="table table-sm">
+                        <thead>
+                            <tr>
+                                <th width="50">Tipo</th>
+                                <th>Nome file</th>
+                                <th>Descrizione</th>
+                                <th>Dimensione</th>
+                                <th>Data</th>
+                                <th width="100">Azioni</th>
+                            </tr>
+                        </thead>
+                        <tbody>
+                            <?php foreach ($attachments as $att): ?>
+                            <tr>
+                                <td class="text-center">
+                                    <?php 
+                                    $icons = [
+                                        'pdf' => '📄',
+                                        'jpg' => '🖼️',
+                                        'jpeg' => '🖼️',
+                                        'png' => '🖼️',
+                                        'doc' => '📝',
+                                        'docx' => '📝',
+                                        'xls' => '📊',
+                                        'xlsx' => '📊'
+                                    ];
+                                    echo $icons[$att['file_type']] ?? '📎';
+                                    ?>
+                                </td>
+                                <td>
+                                    <a href="/app/attachments/download.php?id=<?php echo $att['id']; ?>" 
+                                       target="_blank">
+                                        <?php echo htmlspecialchars($att['original_name']); ?>
+                                    </a>
+                                </td>
+                                <td>
+                                    <small><?php echo htmlspecialchars($att['description'] ?: '-'); ?></small>
+                                </td>
+                                <td>
+                                    <small>
+                                        <?php 
+                                        $bytes = (int)$att['file_size'];
+                                        if ($bytes < 1024) {
+                                            echo $bytes . ' B';
+                                        } elseif ($bytes < 1048576) {
+                                            echo round($bytes / 1024, 1) . ' KB';
+                                        } else {
+                                            echo round($bytes / 1048576, 1) . ' MB';
+                                        }
+                                        ?>
+                                    </small>
+                                </td>
+                                <td>
+                                    <small>
+                                        <?php 
+                                        $date = substr($att['uploaded_at'], 0, 10);
+                                        echo format_date_from_ymd($date);
+                                        ?>
+                                    </small>
+                                </td>
+                                <td>
+                                    <a href="/app/attachments/delete.php?id=<?php echo $att['id']; ?>&return=slot&return_id=<?php echo $id; ?>" 
+                                       class="btn btn-sm btn-outline-danger"
+                                       onclick="return confirm('Eliminare questo allegato?')">
+                                        Elimina
+                                    </a>
+                                </td>
+                            </tr>
+                            <?php endforeach; ?>
+                        </tbody>
+                    </table>
+                </div>
+            <?php else: ?>
+                <p class="text-muted mb-0">Nessun allegato presente</p>
+            <?php endif; ?>
+        </div>
+    </div>
+
+    <!-- Modal Upload -->
+    <div class="modal fade" id="uploadModal" tabindex="-1">
+        <div class="modal-dialog">
+            <div class="modal-content">
+                <form method="POST" action="/app/attachments/upload.php" enctype="multipart/form-data">
+                    <input type="hidden" name="entity_type" value="slot">
+                    <input type="hidden" name="entity_id" value="<?php echo $id; ?>">
+                    <input type="hidden" name="return_url" value="/app/slots/view.php?id=<?php echo $id; ?>">
+                    
+                    <div class="modal-header">
+                        <h5 class="modal-title">Carica allegato</h5>
+                        <button type="button" class="btn-close" data-bs-dismiss="modal"></button>
+                    </div>
+                    
+                    <div class="modal-body">
+                        <div class="mb-3">
+                            <label class="form-label">File *</label>
+                            <input type="file" name="attachment" class="form-control" required
+                                accept=".pdf,.jpg,.jpeg,.png,.doc,.docx,.xls,.xlsx">
+                            <small class="text-muted">
+                                Formati: PDF, JPG, PNG, Word, Excel. Max 10MB
+                            </small>
+                        </div>
+                        
+                        <div class="mb-3">
+                            <label class="form-label">Descrizione (opzionale)</label>
+                            <textarea name="description" class="form-control" rows="2"
+                                    placeholder="es. Contratto, Foto imbarcazione, Documenti..."></textarea>
+                        </div>
+                    </div>
+                    
+                    <div class="modal-footer">
+                        <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">
+                            Annulla
+                        </button>
+                        <button type="submit" class="btn btn-success">
+                            Carica file
+                        </button>
+                    </div>
+                </form>
+            </div>
+        </div>
+    </div>
+
     <!-- Modal per liberare il posto -->
     <?php if ($slot['stato'] !== 'Libero'): ?>
     <div class="modal fade" id="liberaPostoModal" tabindex="-1">
