@@ -28,6 +28,16 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
     if (!$via) $errors[] = 'Via obbligatoria';
     if (!$telefono) $errors[] = 'Telefono obbligatorio';
     if (!$email) $errors[] = 'Email obbligatoria';
+
+    if ($tipologia === 'Barca' && $motore_kw !== '') {
+    $kw_value = floatval($motore_kw);
+    if ($kw_value > 6) {
+        $errors[] = 'Potenza motore massima consentita: 6 KW';
+    }
+    if ($kw_value < 0) {
+        $errors[] = 'La potenza del motore non può essere negativa';
+    }
+}
     
     if ($email && !filter_var($email, FILTER_VALIDATE_EMAIL)) {
         $errors[] = 'Email non valida';
@@ -199,9 +209,16 @@ include __DIR__ . '/../../inc/layout/navbar.php';
                             <div class="row">
                                 <div class="col-md-4 mb-3">
                                     <label class="form-label">Motore (KW)</label>
-                                    <input type="text" name="motore_kw" class="form-control"
-                                           value="<?php echo htmlspecialchars($_POST['motore_kw'] ?? ''); ?>"
-                                           placeholder="es. 50">
+                                    <input type="number" 
+                                        name="motore_kw" 
+                                        class="form-control"
+                                        value="<?php echo htmlspecialchars($_POST['motore_kw'] ?? ''); ?>"
+                                        placeholder="es. 4.5"
+                                        min="0"
+                                        max="6"
+                                        step="0.1"
+                                        title="Massimo 6 KW">
+                                    <small class="text-muted">Max 6 KW consentiti</small>
                                 </div>
                                 <div class="col-md-4 mb-3">
                                     <label class="form-label">Dimensioni</label>
@@ -248,7 +265,6 @@ include __DIR__ . '/../../inc/layout/navbar.php';
 </div>
 
 <script>
-// Mostra/nasconde campi barca
 document.addEventListener('DOMContentLoaded', function() {
     const radioBarca = document.getElementById('tipo_barca');
     const radioCanoa = document.getElementById('tipo_canoa');
@@ -267,6 +283,18 @@ document.addEventListener('DOMContentLoaded', function() {
     
     // Check iniziale
     toggleInfoBarca();
+    
+    // NUOVO: Validazione KW motore
+    const motoreInput = document.querySelector('input[name="motore_kw"]');
+    if (motoreInput) {
+        motoreInput.addEventListener('input', function() {
+            const value = parseFloat(this.value);
+            if (value > 6) {
+                this.value = 6;
+                alert('Attenzione: Il massimo consentito è 6 KW');
+            }
+        });
+    }
 });
 </script>
 

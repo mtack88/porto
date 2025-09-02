@@ -61,6 +61,16 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
     if (!$via) $errors[] = 'Via obbligatoria';
     if (!$telefono) $errors[] = 'Telefono obbligatorio';
     if (!$email) $errors[] = 'Email obbligatoria';
+
+    if ($record['tipologia'] === 'Barca' && $motore_kw !== '') {
+    $kw_value = floatval($motore_kw);
+    if ($kw_value > 6) {
+        $errors[] = 'Potenza motore massima consentita: 6 KW';
+    }
+    if ($kw_value < 0) {
+        $errors[] = 'La potenza del motore non può essere negativa';
+    }
+    }
     
     if ($email && !filter_var($email, FILTER_VALIDATE_EMAIL)) {
         $errors[] = 'Email non valida';
@@ -197,8 +207,15 @@ include __DIR__ . '/../../inc/layout/navbar.php';
                         <div class="row">
                             <div class="col-md-4 mb-3">
                                 <label class="form-label">Motore (KW)</label>
-                                <input type="text" name="motore_kw" class="form-control"
-                                       value="<?php echo htmlspecialchars($motore_kw ?? ''); ?>">
+                                <input type="number" 
+                                    name="motore_kw" 
+                                    class="form-control"
+                                    value="<?php echo htmlspecialchars($motore_kw ?? ''); ?>"
+                                    min="0"
+                                    max="6"
+                                    step="0.1"
+                                    title="Massimo 6 KW">
+                                <small class="text-muted">Max 6 KW consentiti</small>
                             </div>
                             <div class="col-md-4 mb-3">
                                 <label class="form-label">Dimensioni</label>
@@ -394,5 +411,28 @@ include __DIR__ . '/../../inc/layout/navbar.php';
         </div>
     </div>
 </div>
+
+<script>
+document.addEventListener('DOMContentLoaded', function() {
+    // Validazione KW motore
+    const motoreInput = document.querySelector('input[name="motore_kw"]');
+    if (motoreInput) {
+        motoreInput.addEventListener('input', function() {
+            const value = parseFloat(this.value);
+            if (value > 6) {
+                this.value = 6;
+                alert('Attenzione: Il massimo consentito è 6 KW');
+            }
+        });
+        
+        // Validazione al blur (quando l'utente esce dal campo)
+        motoreInput.addEventListener('blur', function() {
+            if (this.value !== '' && parseFloat(this.value) > 6) {
+                this.value = 6;
+            }
+        });
+    }
+});
+</script>
 
 <?php include __DIR__ . '/../../inc/layout/footer.php'; ?>
