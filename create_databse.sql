@@ -158,3 +158,26 @@ JOIN (
   SELECT 11 UNION ALL SELECT 12 UNION ALL SELECT 13 UNION ALL SELECT 14 UNION ALL SELECT 15 UNION ALL
   SELECT 16 UNION ALL SELECT 17 UNION ALL SELECT 18
 ) n ON m.code='RAST';
+
+-- Crea tabella per salvataggio coordinate posti barca
+CREATE TABLE slot_coordinates (
+  id INT UNSIGNED AUTO_INCREMENT PRIMARY KEY,
+  slot_id INT UNSIGNED NOT NULL,
+  north DECIMAL(10,8) NOT NULL,   -- lat max ±90
+  south DECIMAL(10,8) NOT NULL,   -- lat max ±90
+  east  DECIMAL(11,8) NOT NULL,   -- lon max ±180
+  west  DECIMAL(11,8) NOT NULL,   -- lon max ±180
+  created_at DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP,
+  updated_at DATETIME NULL ON UPDATE CURRENT_TIMESTAMP,
+  CONSTRAINT fk_slot_coordinates_slot
+    FOREIGN KEY (slot_id) REFERENCES slots(id) ON DELETE CASCADE,
+  UNIQUE KEY uq_slot (slot_id)
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4;
+
+-- Aggiunge rotazione alle coordinate
+ALTER TABLE slot_coordinates 
+ADD COLUMN rotation DECIMAL(5,2) DEFAULT 0 AFTER west,
+ADD COLUMN center_lat DECIMAL(10,8) AFTER rotation,
+ADD COLUMN center_lng DECIMAL(11,8) AFTER center_lat,
+ADD COLUMN width DECIMAL(10,8) AFTER center_lng,
+ADD COLUMN height DECIMAL(10,8) AFTER width;

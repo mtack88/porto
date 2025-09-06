@@ -3,210 +3,165 @@ declare(strict_types=1);
 require_once __DIR__ . '/../../inc/bootstrap.php';
 require_login();
 
-// Ottieni TUTTI i marina (non solo porti)
-$all_marinas = get_all_marinas();
-$selected_code = $_GET['marina'] ?? $_POST['marina'] ?? 'BOLA';
+// Carica lista pontili per il dropdown
+$stmt = $pdo->query("SELECT id, code, name FROM marinas ORDER BY code");
+$marinas = $stmt->fetchAll(PDO::FETCH_ASSOC);
 
-// Verifica che il codice selezionato sia valido
-$marina_codes = array_column($all_marinas, 'code');
-if (!in_array($selected_code, $marina_codes)) {
-    $selected_code = 'BOLA';
-}
+$errors = [];
 
-// Trova la marina selezionata
-$selected_marina = null;
-foreach ($all_marinas as $m) {
-    if ($m['code'] === $selected_code) {
-        $selected_marina = $m;
-        break;
-    }
-}
-
-// Calcola prossimo numero per ogni marina
-$next_numbers = array();
-foreach ($all_marinas as $m) {
-    $next_numbers[$m['code']] = next_external_number((int)$m['id']);
-}
-
-$errors = array();
-$success = false;
-
-// Gestione POST
 if ($_SERVER['REQUEST_METHOD'] === 'POST') {
-    $csrf = $_POST['csrf_token'] ?? '';
+    // Validazione
+    $marina_id = (int)($_POST['marina_id'] ?? 0);
+    $numero_esterno = trim($_POST['numero_esterno'] ?? '');
+    $numero_interno = trim($_POST['numero_interno'] ?? '');
+    $tipo = $_POST['tipo'] ?? '';
+    $stato = $_POST['stato'] ?? 'Libero';
+    $note = trim($_POST['note'] ?? '');
     
-    if (!verify_csrf_token($csrf)) {
-        $errors[] = 'Token di sicurezza non valido. Ricarica la pagina.';
-    } else {
-        $marina_code = $_POST['marina'] ?? '';
-        $numero_esterno = (int)($_POST['numero_esterno'] ?? 0);
-        $numero_interno = trim($_POST['numero_interno'] ?? '');
-        $tipo = $_POST['tipo'] ?? 'carrello';
-        $note = trim($_POST['note'] ?? '');
-        
-        // Trova marina
-        $marina = get_marina_by_code($marina_code);
-        
-        if (!$marina) {
-            $errors[] = 'Pontile/Marina non valido.';
-        } else {
-            // Se numero non specificato, usa il prossimo disponibile
-            if ($numero_esterno <= 0) {
-                $numero_esterno = next_external_number((int)$marina['id']);
-            }
+    // Controlli
+    if (!$marina_id) $errors[] = 'Seleziona un pontile';
+    if (!$numero_esterno) $errors[] = 'Numero posto obbligatorio';
+    
+    // Verifica che il numero non sia già in uso per questo pontile
+    if ($marina_id && $numero_esterno) {
+        $stmt = $pdo->prepare("
+            SELECT COUNT(*) FROM slots 
+            WHERE marina_id = ? AND numero_esterno = ? AND deleted_at IS NULL
+        ");
+        $stmt->execute([$marina_id, $numero_esterno]);
+        if ($stmt->fetchColumn() > 0) {
+            $errors[] = 'Numero posto già esistente per questo pontile';
+        }
+    }
+    
+    if (empty($errors)) {
+        try {
+            $stmt = $pdo->prepare("
+                INSERT INTO slots (marina_id, numero_esterno, numero_interno, tipo, stato, note, created_at)
+                VALUES (?, ?, ?, ?, ?, ?, NOW())
+            ");
             
-            // Per rastrelliera, ignora il tipo
-            if ($marina['code'] === 'RAST') {
-                $tipo = null;
-            }
+            $stmt->execute([
+                $marina_id,
+                $numero_esterno,
+                $numero_interno ?: null,
+                $tipo ?: null,
+                $stato,
+                $note ?: null
+            ]);
             
-            try {
-                // Verifica duplicati
-                $check = $pdo->prepare("SELECT id FROM slots WHERE marina_id = ? AND numero_esterno = ? LIMIT 1");
-                $check->execute(array($marina['id'], $numero_esterno));
-                
-                if ($check->fetch()) {
-                    $errors[] = "Il posto numero $numero_esterno esiste già in " . $marina['name'];
-                } else {
-                    // Inizia transazione
-                    $pdo->beginTransaction();
-                    
-                    // Inserisci slot
-                    $insert_slot = $pdo->prepare("
-                        INSERT INTO slots (marina_id, numero_esterno, numero_interno, tipo, stato, note, created_at, updated_at)
-                        VALUES (?, ?, ?, ?, 'Libero', ?, NOW(), NOW())
-                    ");
-                    
-                    $insert_slot->execute(array(
-                        $marina['id'],
-                        $numero_esterno,
-                        $numero_interno ?: null,
-                        $tipo,
-                        $note ?: null
-                    ));
-                    
-                    $new_slot_id = (int)$pdo->lastInsertId();
-                    
-                    // Crea assegnazione iniziale
-                    $insert_assignment = $pdo->prepare("
-                        INSERT INTO assignments (slot_id, stato, data_inizio, created_by, created_at)
-                        VALUES (?, 'Libero', CURDATE(), ?, NOW())
-                    ");
-                    
-                    $insert_assignment->execute(array($new_slot_id, current_user_id()));
-                    
-                    // Log evento
-                    log_event('slot', $new_slot_id, 'create', array(
-                        'marina' => $marina['code'],
-                        'numero' => $numero_esterno
-                    ));
-                    
-                    $pdo->commit();
-                    
-                    set_flash('success', "Posto $numero_esterno aggiunto con successo in " . $marina['name']);
-                    header('Location: /app/slots/view.php?id=' . $new_slot_id);
-                    exit;
-                }
-            } catch (Exception $e) {
-                if ($pdo->inTransaction()) {
-                    $pdo->rollBack();
-                }
-                $errors[] = 'Errore database: ' . $e->getMessage();
-            }
+            $new_id = $pdo->lastInsertId();
+            
+            set_flash('success', 'Posto creato con successo');
+            header('Location: /app/slots/view.php?id=' . $new_id);
+            exit;
+            
+        } catch (PDOException $e) {
+            $errors[] = 'Errore database: ' . $e->getMessage();
         }
     }
 }
 
-$title = 'Aggiungi nuovo posto';
-$active = 'slots_list';
+$title = 'Nuovo posto barca';
+$active = 'slots';
 include __DIR__ . '/../../inc/layout/header.php';
 include __DIR__ . '/../../inc/layout/navbar.php';
 ?>
 
 <div class="container py-4">
     <div class="row justify-content-center">
-        <div class="col-md-8">
-            <div class="card shadow">
-                <div class="card-header bg-primary text-white">
-                    <h5 class="mb-0">Aggiungi nuovo posto</h5>
+        <div class="col-md-6">
+            <h1 class="h4 mb-4">Aggiungi nuovo posto barca</h1>
+            
+            <?php if (!empty($errors)): ?>
+                <div class="alert alert-danger">
+                    <ul class="mb-0">
+                        <?php foreach ($errors as $error): ?>
+                            <li><?php echo htmlspecialchars($error); ?></li>
+                        <?php endforeach; ?>
+                    </ul>
                 </div>
-                
+            <?php endif; ?>
+            
+            <div class="card">
+                <div class="card-header bg-primary text-white">
+                    <strong>Dati posto</strong>
+                </div>
                 <div class="card-body">
-                    <?php if (!empty($errors)): ?>
-                        <div class="alert alert-danger">
-                            <ul class="mb-0">
-                                <?php foreach ($errors as $error): ?>
-                                    <li><?php echo htmlspecialchars($error); ?></li>
-                                <?php endforeach; ?>
-                            </ul>
-                        </div>
-                    <?php endif; ?>
-                    
-                    <form method="POST" action="/app/slots/create.php">
-                        <input type="hidden" name="csrf_token" value="<?php echo htmlspecialchars(get_csrf_token()); ?>">
+                    <form method="POST" action="">
                         
-                        <div class="row mb-3">
-                            <div class="col-md-6">
-                                <label for="marina" class="form-label">Pontile/Marina *</label>
-                                <select name="marina" id="marina" class="form-select" required onchange="updateNextNumber()">
-                                    <?php foreach ($all_marinas as $m): ?>
-                                        <option value="<?php echo htmlspecialchars($m['code']); ?>"
-                                                data-next="<?php echo $next_numbers[$m['code']]; ?>"
-                                                data-kind="<?php echo htmlspecialchars($m['kind']); ?>"
-                                                <?php echo ($selected_code === $m['code']) ? 'selected' : ''; ?>>
-                                            <?php echo htmlspecialchars($m['name']); ?> 
-                                            (<?php echo htmlspecialchars($m['kind']); ?>)
-                                        </option>
-                                    <?php endforeach; ?>
-                                </select>
-                            </div>
-                            
-                            <div class="col-md-6">
-                                <label for="numero_esterno" class="form-label">Numero posto *</label>
-                                <input type="number" 
-                                       name="numero_esterno" 
-                                       id="numero_esterno" 
-                                       class="form-control" 
-                                       min="1" 
-                                       required
-                                       placeholder="Lascia vuoto per il prossimo disponibile">
-                                <small class="text-muted" id="next_hint">
-                                    Prossimo disponibile: <?php echo $next_numbers[$selected_code]; ?>
-                                </small>
-                            </div>
-                        </div>
-                        
-                        <div class="row mb-3">
-                            <div class="col-md-6">
-                                <label for="numero_interno" class="form-label">Numero interno (opzionale)</label>
-                                <input type="text" 
-                                       name="numero_interno" 
-                                       id="numero_interno" 
-                                       class="form-control"
-                                       placeholder="Codice interno">
-                            </div>
-                            
-                            <div class="col-md-6" id="tipo_container">
-                                <label for="tipo" class="form-label">Tipo</label>
-                                <select name="tipo" id="tipo" class="form-select">
-                                    <option value="carrello">Carrello</option>
-                                    <option value="fune">Fune</option>
-                                </select>
-                            </div>
-                        </div>
-                        
+                        <!-- Pontile -->
                         <div class="mb-3">
-                            <label for="note" class="form-label">Note (opzionale)</label>
-                            <textarea name="note" 
-                                      id="note" 
-                                      class="form-control" 
-                                      rows="3"
-                                      placeholder="Eventuali annotazioni..."></textarea>
+                            <label class="form-label">Pontile *</label>
+                            <select name="marina_id" class="form-select" required>
+                                <option value="">-- Seleziona pontile --</option>
+                                <?php foreach ($marinas as $marina): ?>
+                                <option value="<?php echo $marina['id']; ?>"
+                                        <?php echo ($_POST['marina_id'] ?? '') == $marina['id'] ? 'selected' : ''; ?>>
+                                    <?php echo htmlspecialchars($marina['name']); ?>
+                                </option>
+                                <?php endforeach; ?>
+                            </select>
                         </div>
                         
-                        <div class="d-flex gap-2">
-                            <button type="submit" class="btn btn-primary">
-                                <strong>Aggiungi posto</strong>
+                        <!-- Numeri -->
+                        <div class="row">
+                            <div class="col-md-6 mb-3">
+                                <label class="form-label">Numero posto *</label>
+                                <input type="text" name="numero_esterno" class="form-control" required
+                                       value="<?php echo htmlspecialchars($_POST['numero_esterno'] ?? ''); ?>"
+                                       placeholder="es. 1, 2, 3...">
+                            </div>
+                            <div class="col-md-6 mb-3">
+                                <label class="form-label">Numero interno</label>
+                                <input type="text" name="numero_interno" class="form-control"
+                                       value="<?php echo htmlspecialchars($_POST['numero_interno'] ?? ''); ?>"
+                                       placeholder="Opzionale">
+                            </div>
+                        </div>
+                        
+                        <!-- Tipo e Stato -->
+                        <div class="row">
+                            <div class="col-md-6 mb-3">
+                                <label class="form-label">Tipo</label>
+                                <select name="tipo" class="form-select">
+                                    <option value="">-- Non specificato --</option>
+                                    <option value="Carrello" <?php echo ($_POST['tipo'] ?? '') === 'Carrello' ? 'selected' : ''; ?>>
+                                        Carrello
+                                    </option>
+                                    <option value="Fune" <?php echo ($_POST['tipo'] ?? '') === 'Fune' ? 'selected' : ''; ?>>
+                                        Fune
+                                    </option>
+                                </select>
+                            </div>
+                            <div class="col-md-6 mb-3">
+                                <label class="form-label">Stato iniziale</label>
+                                <select name="stato" class="form-select">
+                                    <option value="Libero" <?php echo ($_POST['stato'] ?? 'Libero') === 'Libero' ? 'selected' : ''; ?>>
+                                        🟢 Libero
+                                    </option>
+                                    <option value="Riservato" <?php echo ($_POST['stato'] ?? '') === 'Riservato' ? 'selected' : ''; ?>>
+                                        🟡 Riservato
+                                    </option>
+                                    <option value="Manutenzione" <?php echo ($_POST['stato'] ?? '') === 'Manutenzione' ? 'selected' : ''; ?>>
+                                        🔧 Manutenzione
+                                    </option>
+                                </select>
+                            </div>
+                        </div>
+                        
+                        <!-- Note -->
+                        <div class="mb-3">
+                            <label class="form-label">Note</label>
+                            <textarea name="note" class="form-control" rows="3"
+                                      placeholder="Eventuali note o osservazioni..."><?php echo htmlspecialchars($_POST['note'] ?? ''); ?></textarea>
+                        </div>
+                        
+                        <hr>
+                        
+                        <div class="d-grid gap-2">
+                            <button type="submit" class="btn btn-success">
+                                <strong>✓ Crea posto</strong>
                             </button>
                             <a href="/app/slots/list.php" class="btn btn-outline-secondary">
                                 Annulla
@@ -214,38 +169,13 @@ include __DIR__ . '/../../inc/layout/navbar.php';
                         </div>
                     </form>
                 </div>
-                
-                <div class="card-footer text-muted">
-                    <small>Il posto verrà creato con stato iniziale "Libero"</small>
-                </div>
+            </div>
+            
+            <div class="alert alert-info mt-3">
+                <strong>Suggerimento:</strong> Dopo aver creato il posto, potrai assegnarlo a un proprietario dalla pagina dei dettagli.
             </div>
         </div>
     </div>
 </div>
-
-<script>
-function updateNextNumber() {
-    const select = document.getElementById('marina');
-    const option = select.options[select.selectedIndex];
-    const next = option.getAttribute('data-next');
-    const kind = option.getAttribute('data-kind');
-    const hint = document.getElementById('next_hint');
-    const tipoContainer = document.getElementById('tipo_container');
-    
-    hint.textContent = 'Prossimo disponibile: ' + next;
-    
-    // Nascondi tipo per rastrelliera
-    if (select.value === 'RAST') {
-        tipoContainer.style.display = 'none';
-    } else {
-        tipoContainer.style.display = 'block';
-    }
-}
-
-// Inizializza al caricamento
-document.addEventListener('DOMContentLoaded', function() {
-    updateNextNumber();
-});
-</script>
 
 <?php include __DIR__ . '/../../inc/layout/footer.php'; ?>
