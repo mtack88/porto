@@ -50,9 +50,9 @@ include __DIR__ . '/../inc/layout/navbar.php';
           </div>
           <div class="card-footer d-flex gap-2">
             <?php if ($st['code']==='BOLA'): ?>
-              <a href="/app/map_bola.php" class="btn btn-outline-primary btn-sm">Vedi mappa</a>
+              <a href="/app/map/bola.php" class="btn btn-outline-primary btn-sm">Vedi mappa</a>
             <?php elseif ($st['code']==='RITTER'): ?>
-              <a href="/app/map_ritter.php" class="btn btn-outline-primary btn-sm">Vedi mappa</a>
+              <a href="/app/map/ritter.php" class="btn btn-outline-primary btn-sm">Vedi mappa</a>
             <?php else: ?>
               <a href="/app/rack/grid.php" class="btn btn-outline-primary btn-sm">Vedi griglia</a>
             <?php endif; ?>

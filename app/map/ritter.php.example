@@ -108,6 +108,15 @@ include __DIR__ . '/../../inc/layout/navbar.php';
 .rotation-slider {
     width: 100%;
 }
+
+.edit-controls {
+    background: #d4edda;
+    border: 2px solid #28a745;
+    padding: 15px;
+    margin: 10px;
+    border-radius: 5px;
+    max-width: 350px;
+}
 </style>
 
 <div class="container-fluid py-4">
@@ -116,7 +125,7 @@ include __DIR__ . '/../../inc/layout/navbar.php';
             <h1 class="h4 mb-3">
                 Mappa Interattiva - Porto W. Ritter
                 <?php if ($editMode): ?>
-                    <span class="badge bg-warning">MODALITÀ DISEGNO</span>
+                    <span class="badge bg-warning">MODALITÀ MODIFICA</span>
                 <?php endif; ?>
             </h1>
             
@@ -128,11 +137,11 @@ include __DIR__ . '/../../inc/layout/navbar.php';
                             <button class="btn btn-outline-success btn-sm" onclick="filterByStatus('Libero')">Liberi</button>
                             <button class="btn btn-outline-danger btn-sm" onclick="filterByStatus('Occupato')">Occupati</button>
                         </div>
-                        <a href="?edit=1" class="btn btn-warning btn-sm ms-3">🖊️ Modalità Disegno</a>
+                        <a href="?edit=1" class="btn btn-warning btn-sm ms-3">🖊️ Modalità Modifica</a>
                     <?php else: ?>
-                        <a href="/app/map/ritter.php" class="btn btn-primary btn-sm">← Esci da modalità disegno</a>
+                        <a href="/app/map/ritter.php" class="btn btn-primary btn-sm">← Esci da modalità modifica</a>
                     <?php endif; ?>
-                    <a href="/app/map/index.php" class="btn btn-outline-primary btn-sm ms-2">Mappa Porto Bola</a>
+                    <a href="/app/map/bola.php" class="btn btn-outline-primary btn-sm ms-2">Mappa Porto Bola</a>
                 </div>
                 <div class="col-md-4 text-end">
                     <span class="badge bg-info">Totale: <?php echo count($slots); ?></span>
@@ -180,11 +189,12 @@ var selectedSlot = null;
 var currentRectangle = null;
 var currentPolygon = null;
 var currentRotation = 0;
+var editModePolygon = null;
 
 function initMap() {
     map = new google.maps.Map(document.getElementById('map'), {
         center: PORTO_CENTER,
-        zoom: 19,
+        zoom: 20,
         mapTypeId: 'satellite',
         tilt: 0,
         rotateControl: true,
@@ -199,6 +209,7 @@ function initMap() {
     if (editMode) {
         initDrawingMode();
         addDrawingControls();
+        addEditControls();
     }
     
     addLegend();
@@ -330,6 +341,8 @@ function createSlotPolygon(vertices, slot, saved) {
     polygon.addListener('click', function() {
         if (!editMode) {
             showSlotInfo(slot, center);
+        } else {
+            startEditSlot(slot, polygon);
         }
     });
     
@@ -337,41 +350,45 @@ function createSlotPolygon(vertices, slot, saved) {
     return polygon;
 }
 
-function calculateRotatedRectangle(center, widthDeg, heightDeg, rotation) {
+function calculateRotatedRectangle(center, width, height, rotation) {
     var angleRad = rotation * Math.PI / 180;
     var cos = Math.cos(angleRad);
     var sin = Math.sin(angleRad);
     
-    // Converti da gradi decimali a metri
-    var widthMeters = widthDeg * 111320 * Math.cos(center.lat * Math.PI / 180);
-    var heightMeters = heightDeg * 111320;
+    // Fattore di conversione per questa latitudine
+    var metersPerDegreeLat = 111320;
+    var metersPerDegreeLng = 111320 * Math.cos(center.lat * Math.PI / 180);
+    
+    // Converti da gradi a metri
+    var widthMeters = width * metersPerDegreeLng;
+    var heightMeters = height * metersPerDegreeLat;
     
     // Metà dimensioni in metri
     var hw = widthMeters / 2;
     var hh = heightMeters / 2;
     
-    var points = [
-        {x: -hw, y: -hh}, // bottom-left
-        {x: hw, y: -hh},  // bottom-right
-        {x: hw, y: hh},   // top-right
-        {x: -hw, y: hh}   // top-left
+    // I 4 angoli del rettangolo in metri
+    var corners = [
+        {x: -hw, y: -hh},
+        {x: hw, y: -hh},
+        {x: hw, y: hh},
+        {x: -hw, y: hh}
     ];
     
-    // Ruota i punti
-    var rotatedPoints = points.map(function(point) {
-        return {
-            x: point.x * cos - point.y * sin,
-            y: point.x * sin + point.y * cos
-        };
+    var vertices = [];
+    
+    // Ruota ogni angolo e converti di nuovo in gradi
+    corners.forEach(function(corner) {
+        var rotatedX = corner.x * cos - corner.y * sin;
+        var rotatedY = corner.x * sin + corner.y * cos;
+        
+        vertices.push({
+            lat: center.lat + (rotatedY / metersPerDegreeLat),
+            lng: center.lng + (rotatedX / metersPerDegreeLng)
+        });
     });
     
-    // Converti da metri tornando a gradi decimali
-    return rotatedPoints.map(function(point) {
-        return {
-            lat: center.lat + (point.y / 111320),
-            lng: center.lng + (point.x / (111320 * Math.cos(center.lat * Math.PI / 180)))
-        };
-    });
+    return vertices;
 }
 
 function initDrawingMode() {
@@ -396,12 +413,8 @@ function initDrawingMode() {
         drawingManager.setDrawingMode(null);
         
         var bounds = rectangle.getBounds();
-        var ne = bounds.getNorthEast();
-        var sw = bounds.getSouthWest();
         var center = bounds.getCenter();
         
-        currentRectangle.originalWidth = ne.lng() - sw.lng();
-        currentRectangle.originalHeight = ne.lat() - sw.lat();
         currentRectangle.originalCenter = {
             lat: center.lat(),
             lng: center.lng()
@@ -423,25 +436,282 @@ function addDrawingControls() {
     });
     
     controlDiv.innerHTML = '<div class="drawing-controls">' +
-        '<h6>Modalità Disegno</h6>' +
+        '<h6>Nuovo Posto</h6>' +
         '<div class="slot-list">' +
         '<strong>Posti da posizionare:</strong><br>' +
         slotListHtml +
         '</div>' +
         '<button class="btn btn-success btn-sm mb-2" onclick="startDrawing()">' +
         'Disegna nuovo posto' +
+        '</button> ' +
+        '<div class="mt-1">' +
+        '<button class="btn btn-info btn-sm mb-2" onclick="addPredefinedRectangle()">' +
+        'Rettangolo predefinito' +
         '</button>'+
         '<div id="rotation-controls" class="rotation-control" style="display:none;">' +
-        '<strong>Rotazione (opzionale):</strong>' +
+        '<strong>Rotazione:</strong>' +
         '<input type="range" class="rotation-slider" id="rotation-slider" ' +
         'min="-180" max="180" value="0" oninput="updateRotation(this.value)" onchange="updateRotation(this.value)">' +
         '<div>Angolo: <span id="rotation-value">0°</span></div>' +
         '<div class="mt-2">' +
         '<button class="btn btn-primary btn-sm" onclick="saveRectangle()">Salva posizione</button> ' +
         '<button class="btn btn-danger btn-sm" onclick="cancelRectangle()">Annulla</button>' +
-        '</div></div></div>';
+        '</div></div></div></div>';
     
     map.controls[google.maps.ControlPosition.LEFT_TOP].push(controlDiv);
+}
+
+function addEditControls() {
+    var controlDiv = document.createElement('div');
+    
+    controlDiv.innerHTML = '<div class="edit-controls">' +
+        '<h6>Modifica Posti Esistenti</h6>' +
+        '<p class="small">Clicca su un posto per modificarlo.<br>' +
+        '<strong>Trascina</strong> per spostare, usa lo <strong>slider</strong> per ruotare.</p>' +
+        '<div id="edit-controls" style="display:none;">' +
+        '<strong>Modifica posto: <span id="edit-slot-number"></span></strong>' +
+        '<div class="rotation-control">' +
+        '<strong>Rotazione:</strong>' +
+        '<input type="range" class="rotation-slider" id="edit-rotation-slider" ' +
+        'min="-180" max="180" value="0" oninput="updateEditRotation(this.value)" onchange="updateEditRotation(this.value)">' +
+        '<div>Angolo: <span id="edit-rotation-value">0°</span></div>' +
+        '</div>' +
+        '<div class="mt-2">' +
+        '<button class="btn btn-success btn-sm" onclick="saveEdit()">Salva modifiche</button> ' +
+        '<button class="btn btn-danger btn-sm" onclick="deleteSlotPosition()">Elimina posizione</button> ' +
+        '<button class="btn btn-secondary btn-sm" onclick="cancelEdit()">Annulla</button>' +
+        '</div></div></div>';
+    
+    map.controls[google.maps.ControlPosition.LEFT_BOTTOM].push(controlDiv);
+}
+
+function startEditSlot(slot, polygon) {
+    selectedSlot = slot;
+    
+    // Ricrea il poligono come draggable
+    var vertices = polygon.getPath().getArray();
+    var color = getSlotColor(slot.stato);
+    
+    // Rimuovi il vecchio poligono
+    polygon.setMap(null);
+    
+    // Crea nuovo poligono modificabile
+    editModePolygon = new google.maps.Polygon({
+        paths: vertices,
+        strokeColor: '#FFD700',
+        strokeOpacity: 1,
+        strokeWeight: 3,
+        fillColor: color,
+        fillOpacity: 0.5,
+        map: map,
+        draggable: true,  // IMPORTANTE: rendilo trascinabile
+        editable: false   // Non editare i vertici singoli
+    });
+    
+    // Salva le dimensioni e posizione originali
+    editModePolygon.originalWidth = parseFloat(slot.width) || 0.00003;
+    editModePolygon.originalHeight = parseFloat(slot.height) || 0.00002;
+    editModePolygon.originalRotation = parseFloat(slot.rotation) || 0;
+    
+    // Calcola il centro attuale
+    var sumLat = 0, sumLng = 0;
+    vertices.forEach(function(v) {
+        sumLat += v.lat();
+        sumLng += v.lng();
+    });
+    editModePolygon.currentCenter = {
+        lat: sumLat / vertices.length,
+        lng: sumLng / vertices.length
+    };
+    
+    // Aggiungi listener per tracciare il trascinamento
+    google.maps.event.addListener(editModePolygon, 'dragend', function() {
+        // Aggiorna il centro dopo il trascinamento
+        var newPath = editModePolygon.getPath();
+        var sumLat = 0, sumLng = 0;
+        for (var i = 0; i < newPath.getLength(); i++) {
+            sumLat += newPath.getAt(i).lat();
+            sumLng += newPath.getAt(i).lng();
+        }
+        editModePolygon.currentCenter = {
+            lat: sumLat / newPath.getLength(),
+            lng: sumLng / newPath.getLength()
+        };
+    });
+    
+    // Nascondi tutti gli altri poligoni
+    slotShapes.forEach(function(shape) {
+        if (shape !== polygon) {
+            shape.setMap(null);
+        }
+    });
+    
+    // Mostra i controlli di modifica
+    document.getElementById('edit-controls').style.display = 'block';
+    document.getElementById('edit-slot-number').textContent = slot.numero_esterno;
+    
+    // Imposta la rotazione corrente
+    var currentRot = slot.rotation || 0;
+    document.getElementById('edit-rotation-slider').value = currentRot;
+    document.getElementById('edit-rotation-value').textContent = currentRot + '°';
+    currentRotation = currentRot;
+}
+
+function addPredefinedRectangle() {
+    // Verifica che sia selezionato un posto
+    var selectedRadio = document.querySelector('input[name="slot_select"]:checked');
+    if (!selectedRadio) {
+        alert('Seleziona prima un posto dalla lista!');
+        return;
+    }
+    
+    selectedSlot = slotsWithoutCoords.find(function(s) { 
+        return s.id == selectedRadio.value; 
+    });
+    
+    // Cancella eventuali rettangoli precedenti
+    if (currentRectangle) {
+        currentRectangle.setMap(null);
+    }
+    if (currentPolygon) {
+        currentPolygon.setMap(null);
+    }
+    
+    // Dimensioni predefinite
+    var predefinedWidth = 0.00001743;
+    var predefinedHeight = 0.00004196;
+    
+    // Posiziona al centro della vista corrente
+    var center = map.getCenter();
+    
+    // Crea il rettangolo con le dimensioni predefinite
+    var bounds = {
+        north: center.lat() + predefinedHeight / 2,
+        south: center.lat() - predefinedHeight / 2,
+        east: center.lng() + predefinedWidth / 2,
+        west: center.lng() - predefinedWidth / 2
+    };
+    
+    currentRectangle = new google.maps.Rectangle({
+        bounds: bounds,
+        strokeColor: '#FFD700',
+        strokeOpacity: 1,
+        strokeWeight: 2,
+        fillColor: '#FFD700',
+        fillOpacity: 0.5,
+        map: map,
+        editable: false,  // Non editare i vertici
+        draggable: true   // Ma permettere di spostarlo
+    });
+    
+    // Salva le dimensioni e il centro originali
+    currentRectangle.originalWidth = predefinedWidth;
+    currentRectangle.originalHeight = predefinedHeight;
+    currentRectangle.originalCenter = {
+        lat: center.lat(),
+        lng: center.lng()
+    };
+    
+    // Aggiungi listener per aggiornare il centro quando viene trascinato
+    google.maps.event.addListener(currentRectangle, 'bounds_changed', function() {
+        var newBounds = currentRectangle.getBounds();
+        var newCenter = newBounds.getCenter();
+        currentRectangle.originalCenter = {
+            lat: newCenter.lat(),
+            lng: newCenter.lng()
+        };
+    });
+    
+    // Reset rotazione e mostra controlli
+    currentRotation = 0;
+    document.getElementById('rotation-slider').value = 0;
+    document.getElementById('rotation-value').textContent = '0°';
+    document.getElementById('rotation-controls').style.display = 'block';
+}
+
+function updateEditRotation(value) {
+    currentRotation = parseFloat(value);
+    document.getElementById('edit-rotation-value').textContent = value + '°';
+    
+    if (editModePolygon) {
+        // Usa il centro CORRENTE (che potrebbe essere stato spostato)
+        var center = editModePolygon.currentCenter;
+        var width = editModePolygon.originalWidth;
+        var height = editModePolygon.originalHeight;
+        
+        var vertices = calculateRotatedRectangle(center, width, height, currentRotation);
+        editModePolygon.setPath(vertices);
+        
+        // Mantieni il poligono draggable dopo la rotazione
+        editModePolygon.setOptions({draggable: true});
+    }
+}
+
+function saveEdit() {
+    if (!editModePolygon || !selectedSlot) return;
+    
+    // Usa il centro CORRENTE (dopo eventuali spostamenti)
+    var center = editModePolygon.currentCenter;
+    
+    // Calcola i bounds per compatibilità
+    var path = editModePolygon.getPath();
+    var bounds = new google.maps.LatLngBounds();
+    for (var i = 0; i < path.getLength(); i++) {
+        bounds.extend(path.getAt(i));
+    }
+    
+    var data = {
+        slot_id: selectedSlot.id,
+        north: bounds.getNorthEast().lat(),
+        south: bounds.getSouthWest().lat(),
+        east: bounds.getNorthEast().lng(),
+        west: bounds.getSouthWest().lng(),
+        rotation: currentRotation,
+        center_lat: center.lat,  // Usa il centro aggiornato
+        center_lng: center.lng,  // Usa il centro aggiornato
+        width: editModePolygon.originalWidth,
+        height: editModePolygon.originalHeight
+    };
+    
+    fetch('/app/map/save_coordinates.php', {
+        method: 'POST',
+        headers: {'Content-Type': 'application/json'},
+        body: JSON.stringify(data)
+    })
+    .then(function(response) { return response.json(); })
+    .then(function(result) {
+        if (result.success) {
+            alert('Modifiche salvate!');
+            location.reload();
+        } else {
+            alert('Errore: ' + result.error);
+        }
+    });
+}
+
+function deleteSlotPosition() {
+    if (!selectedSlot) return;
+    
+    if (confirm('Sei sicuro di voler eliminare la posizione del posto ' + selectedSlot.numero_esterno + '?')) {
+        fetch('/app/map/delete_coordinates.php', {
+            method: 'POST',
+            headers: {'Content-Type': 'application/json'},
+            body: JSON.stringify({slot_id: selectedSlot.id})
+        })
+        .then(function(response) { return response.json(); })
+        .then(function(result) {
+            if (result.success) {
+                alert('Posizione eliminata!');
+                location.reload();
+            } else {
+                alert('Errore: ' + result.error);
+            }
+        });
+    }
+}
+
+function cancelEdit() {
+    location.reload();
 }
 
 function startDrawing() {
@@ -464,38 +734,17 @@ function updateRotation(value) {
     currentRotation = parseFloat(value);
     document.getElementById('rotation-value').textContent = value + '°';
     
-    if (currentRectangle) {
-        // Ottieni i bounds ORIGINALI (prima della rotazione)
-        var bounds = currentRectangle.getBounds();
-        var ne = bounds.getNorthEast();
-        var sw = bounds.getSouthWest();
+    if (currentRectangle && currentRotation !== 0) {
+        // Usa sempre le dimensioni originali salvate
+        var width = currentRectangle.originalWidth;
+        var height = currentRectangle.originalHeight;
+        var center = currentRectangle.originalCenter;
         
-        // Calcola dimensioni ORIGINALI
-        var originalWidth = Math.abs(ne.lng() - sw.lng());
-        var originalHeight = Math.abs(ne.lat() - sw.lat());
-        var originalCenter = {
-            lat: (ne.lat() + sw.lat()) / 2,
-            lng: (ne.lng() + sw.lng()) / 2
-        };
+        var vertices = calculateRotatedRectangle(center, width, height, currentRotation);
         
-        // Se rotazione = 0, mostra il rettangolo originale
-        if (currentRotation === 0) {
-            if (currentPolygon) {
-                currentPolygon.setMap(null);
-                currentPolygon = null;
-            }
-            currentRectangle.setMap(map);
-            return;
-        }
-        
-        // Nascondi rettangolo originale e mostra poligono ruotato
-        currentRectangle.setMap(null);
-        
-        // Calcola vertici del rettangolo ruotato
-        var vertices = calculateRotatedRectangle(originalCenter, originalWidth, originalHeight, currentRotation);
-        
-        // Crea o aggiorna il poligono ruotato
-        if (!currentPolygon) {
+        if (currentPolygon) {
+            currentPolygon.setPath(vertices);
+        } else {
             currentPolygon = new google.maps.Polygon({
                 paths: vertices,
                 strokeColor: '#FFD700',
@@ -505,16 +754,35 @@ function updateRotation(value) {
                 fillOpacity: 0.5,
                 map: map,
                 editable: false,
-                draggable: true
+                draggable: true  // Mantieni draggable
             });
-        } else {
-            currentPolygon.setPath(vertices);
+            
+            // Salva le proprietà
+            currentPolygon.originalWidth = width;
+            currentPolygon.originalHeight = height;
+            currentPolygon.originalCenter = center;
+            
+            // Aggiungi listener per tracciare il trascinamento
+            google.maps.event.addListener(currentPolygon, 'dragend', function() {
+                var newPath = currentPolygon.getPath();
+                var sumLat = 0, sumLng = 0;
+                for (var i = 0; i < newPath.getLength(); i++) {
+                    sumLat += newPath.getAt(i).lat();
+                    sumLng += newPath.getAt(i).lng();
+                }
+                currentPolygon.originalCenter = {
+                    lat: sumLat / newPath.getLength(),
+                    lng: sumLng / newPath.getLength()
+                };
+            });
+            
+            currentRectangle.setMap(null);
         }
-        
-        // Salva i dati ORIGINALI
-        currentPolygon.originalCenter = originalCenter;
-        currentPolygon.originalWidth = originalWidth;
-        currentPolygon.originalHeight = originalHeight;
+    } else if (currentRotation === 0 && currentPolygon) {
+        // Torna al rettangolo se rotazione è 0
+        currentRectangle.setMap(map);
+        currentPolygon.setMap(null);
+        currentPolygon = null;
     }
 }
 
@@ -524,22 +792,31 @@ function saveRectangle() {
     var data;
     
     if (currentPolygon && currentRotation !== 0) {
-        // Usa i dati ORIGINALI salvati, non i bounds del poligono ruotato
+        // Usa il centro aggiornato dopo eventuali trascinamenti
+        var center = currentPolygon.originalCenter;
+        
+        // Calcola bounds per compatibilità
+        var bounds = new google.maps.LatLngBounds();
+        currentPolygon.getPath().forEach(function(latlng) {
+            bounds.extend(latlng);
+        });
+        
         data = {
             slot_id: selectedSlot.id,
-            north: currentPolygon.originalCenter.lat + currentPolygon.originalHeight / 2,
-            south: currentPolygon.originalCenter.lat - currentPolygon.originalHeight / 2,
-            east: currentPolygon.originalCenter.lng + currentPolygon.originalWidth / 2,
-            west: currentPolygon.originalCenter.lng - currentPolygon.originalWidth / 2,
+            north: bounds.getNorthEast().lat(),
+            south: bounds.getSouthWest().lat(),
+            east: bounds.getNorthEast().lng(),
+            west: bounds.getSouthWest().lng(),
             rotation: currentRotation,
-            center_lat: currentPolygon.originalCenter.lat,
-            center_lng: currentPolygon.originalCenter.lng,
+            center_lat: center.lat,
+            center_lng: center.lng,
             width: currentPolygon.originalWidth,
             height: currentPolygon.originalHeight
         };
     } else {
+        // Rettangolo non ruotato
         var bounds = currentRectangle.getBounds();
-        var center = bounds.getCenter();
+        var center = currentRectangle.originalCenter;
         
         data = {
             slot_id: selectedSlot.id,
@@ -548,10 +825,10 @@ function saveRectangle() {
             east: bounds.getNorthEast().lng(),
             west: bounds.getSouthWest().lng(),
             rotation: 0,
-            center_lat: center.lat(),
-            center_lng: center.lng(),
-            width: Math.abs(bounds.getNorthEast().lng() - bounds.getSouthWest().lng()),
-            height: Math.abs(bounds.getNorthEast().lat() - bounds.getSouthWest().lat())
+            center_lat: center.lat,
+            center_lng: center.lng,
+            width: currentRectangle.originalWidth,
+            height: currentRectangle.originalHeight
         };
     }
     
@@ -623,7 +900,7 @@ function addLegend() {
     if (editMode) {
         editLegend = '<div class="legend-item">' +
             '<span class="legend-color" style="background: #FFD700;"></span>' +
-            '<span>Nuovo/Non salvato</span>' +
+            '<span>Nuovo/Modifica</span>' +
             '</div>';
     }
     
@@ -655,7 +932,7 @@ function filterByStatus(status) {
 </script>
 
 <script async defer 
-    src="https://maps.googleapis.com/maps/api/js?key=AIzaSyA_Gq0x3SiNY2jVTaeSKE34ZazIdRNw2A0&libraries=drawing&callback=initMap">
+    src="https://maps.googleapis.com/maps/api/js?key=YOUR_API&libraries=drawing&callback=initMap">
 </script>
 
 <?php include __DIR__ . '/../../inc/layout/footer.php'; ?>

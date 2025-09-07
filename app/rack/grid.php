@@ -26,7 +26,7 @@ foreach ($all_slots as $slot) {
 ?>
 
 <div class="container py-4">
-    <h1 class="h4 mb-3">Rastrelliera — Vista griglia 3 colonne × 6 righe</h1>
+    <h1 class="h4 mb-3">Rastrelliera</h1>
     
     <!-- Griglia usando CSS Grid -->
     <div style="display: grid; grid-template-columns: repeat(3, 1fr); gap: 15px; max-width: 900px; margin: 0 auto;">
@@ -122,31 +122,6 @@ foreach ($all_slots as $slot) {
             }
         }
         ?>
-    </div>
-    
-    <!-- Schema visivo per chiarezza -->
-    <div class="mt-4">
-        <div class="card">
-            <div class="card-header bg-light">
-                <h6 class="mb-0">Schema numerazione posti (per colonna)</h6>
-            </div>
-            <div class="card-body">
-                <div class="row text-center">
-                    <div class="col-4">
-                        <strong>Colonna 1</strong><br>
-                        R1 → R6
-                    </div>
-                    <div class="col-4">
-                        <strong>Colonna 2</strong><br>
-                        R7 → R12
-                    </div>
-                    <div class="col-4">
-                        <strong>Colonna 3</strong><br>
-                        R13 → R18
-                    </div>
-                </div>
-            </div>
-        </div>
     </div>
     
     <!-- Legenda e azioni -->

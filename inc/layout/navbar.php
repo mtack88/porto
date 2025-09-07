@@ -13,8 +13,8 @@ declare(strict_types=1);
     <div class="collapse navbar-collapse" id="nav">
       <ul class="navbar-nav me-auto mb-2 mb-lg-0">
         <li class="nav-item"><a class="nav-link <?= ($active??'')==='dashboard'?'active':'' ?>" href="/app/dashboard.php">Dashboard</a></li>
-        <li class="nav-item"><a class="nav-link <?= ($active??'')==='map_bola'?'active':'' ?>" href="/app/map_bola.php">Mappa Bola</a></li>
-        <li class="nav-item"><a class="nav-link <?= ($active??'')==='map_ritter'?'active':'' ?>" href="/app/map_ritter.php">Mappa Ritter</a></li>
+        <li class="nav-item"><a class="nav-link <?= ($active??'')==='map_bola'?'active':'' ?>" href="/app/map/bola.php">Mappa Bola</a></li>
+        <li class="nav-item"><a class="nav-link <?= ($active??'')==='map_ritter'?'active':'' ?>" href="/app/map/ritter.php">Mappa Ritter</a></li>
         <li class="nav-item"><a class="nav-link <?= ($active??'')==='rack'?'active':'' ?>" href="/app/rack/grid.php">Rastrelliera</a></li>
         <li class="nav-item"><a class="nav-link <?= ($active??'')==='slots_list'?'active':'' ?>" href="/app/slots/list.php">Tabella posti</a></li>
         <li class="nav-item"><a class="nav-link <?= ($active??'')==='history'?'active':'' ?>" href="/app/history/list.php">Storico</a></li>
