@@ -1,0 +1,17 @@
+# Blocca accesso a file sensibili
+<FilesMatch "^\.env|\.git|composer\.(json|lock)$">
+    Order allow,deny
+    Deny from all
+</FilesMatch>
+
+# Blocca accesso a directory sensibili
+<DirectoryMatch "^(.*/)?(\.|inc|vendor|config|logs)/">
+    Order allow,deny
+    Deny from all
+</DirectoryMatch>
+
+# Proteggi anche i file di backup
+<FilesMatch "\.(bak|backup|sql|log|ini)$">
+    Order allow,deny
+    Deny from all
+</FilesMatch>
