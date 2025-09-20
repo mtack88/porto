@@ -18,10 +18,6 @@ Programma per la gestione dei porti comunali e delle liste d'attesa.
 
    Inserire i dati di invio delle e-mail in tutti i campi e poi rinominare il file in mail_config.php.
     
-**5) Modificare /app/map/bola.php.example e ritter.php.example**
-
-   Alla fine del file sostituire YOUR_API con la propria API di Google Maps.
-    
-**6) Se vengono cambiati i nomi dei porti**
+**5) Se vengono cambiati i nomi dei porti**
 
    Ricordarsi di modificare tutti i riferimenti agli attuali nomi dei porti in tutti i file (navbar, dashboard, ecc.)
