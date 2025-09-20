@@ -3,6 +3,8 @@ declare(strict_types=1);
 require_once __DIR__ . '/../../inc/bootstrap.php';
 require_login();
 
+$google_maps_key = env('GOOGLE_MAPS_API_KEY', '');
+
 // Modalità edit
 $editMode = isset($_GET['edit']) && $_GET['edit'] === '1';
 
@@ -954,7 +956,7 @@ function filterByStatus(status) {
 </script>
 
 <script async defer 
-    src="https://maps.googleapis.com/maps/api/js?key=YOUR_API&libraries=drawing&callback=initMap">
+    src="https://maps.googleapis.com/maps/api/js?key=<?php echo htmlspecialchars($google_maps_key); ?>&libraries=drawing&callback=initMap">
 </script>
 
 <?php include __DIR__ . '/../../inc/layout/footer.php'; ?>

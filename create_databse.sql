@@ -181,3 +181,14 @@ ADD COLUMN center_lat DECIMAL(10,8) AFTER rotation,
 ADD COLUMN center_lng DECIMAL(11,8) AFTER center_lat,
 ADD COLUMN width DECIMAL(10,8) AFTER center_lng,
 ADD COLUMN height DECIMAL(10,8) AFTER width;
+
+-- Tabella per rate limiting login
+CREATE TABLE IF NOT EXISTS login_attempts (
+  id INT UNSIGNED AUTO_INCREMENT PRIMARY KEY,
+  ip_address VARCHAR(45) NOT NULL,
+  email VARCHAR(190) NULL,
+  attempt_time DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP,
+  success TINYINT(1) NOT NULL DEFAULT 0,
+  INDEX idx_ip_time (ip_address, attempt_time),
+  INDEX idx_email_time (email, attempt_time)
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4;
